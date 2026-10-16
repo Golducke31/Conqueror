@@ -14,6 +14,13 @@
  * del color anterior (que sigue en los atributos por vertice) al del dueno
  * nuevo. Cuando la onda termina, `setGameState` reescribe los atributos con el
  * color definitivo y la onda se apaga: el corte es invisible.
+ *
+ * El FRENTE CALIENTE (battleHeat, C4) es un atributo por vertice (`aHeat`,
+ * 0..1 por territorio, derivado del log de eventos — ver heat/heatModel.ts).
+ * Se refleja en el shader: oscurecimiento, humo claro y brasas en los BORDES
+ * del territorio. El borde se detecta con `fwidth(vTerritory)`: dentro de un
+ * territorio el atributo es constante (derivada cero) y salta en la frontera.
+ * Es solo visual y no decide nada.
  */
 
 import type { Color, Vector3 } from 'three';
@@ -30,6 +37,8 @@ export interface TerritoryMaterialHandle {
   readonly material: ShaderMaterial;
   /** Atenuacion global, 0 = negro, 1 = normal. */
   setDim(value: number): void;
+  /** Reloj para el pulso de las brasas y el humo. */
+  setTime(seconds: number): void;
   /**
    * Arranca la onda de cambio de dueno sobre un territorio.
    * El radio arranca en 0; quien anima llama a `setWaveRadius`.
@@ -53,16 +62,25 @@ export interface TerritoryMaterialHandle {
 /** Ancho del borde brillante del frente de la onda. */
 const WAVE_EDGE = 26;
 
+/** Cuanto oscurece el calor en el centro del territorio. */
+const HEAT_DARKEN = 0.35;
+
+/** Cuanto de humo claro se mezcla con el calor a tope. */
+const HEAT_SMOKE = 0.18;
+
 const TERRITORY_VERTEX = /* glsl */ `
   attribute float aTerritory;
+  attribute float aHeat;
   varying vec3 vColor;
   varying vec3 vNormal;
   varying float vTerritory;
+  varying float vHeat;
   varying vec2 vWorldXZ;
   void main() {
     vColor = color;
     vNormal = normalize(normalMatrix * normal);
     vTerritory = aTerritory;
+    vHeat = aHeat;
     vec4 world = modelMatrix * vec4(position, 1.0);
     vWorldXZ = world.xz;
     gl_Position = projectionMatrix * viewMatrix * world;
@@ -73,6 +91,7 @@ const TERRITORY_FRAGMENT = /* glsl */ `
   uniform vec3 uLightDirection;
   uniform float uAmbient;
   uniform float uDim;
+  uniform float uTime;
   uniform float uWaveTerritory;
   uniform vec2 uWaveOrigin;
   uniform float uWaveRadius;
@@ -80,6 +99,7 @@ const TERRITORY_FRAGMENT = /* glsl */ `
   varying vec3 vColor;
   varying vec3 vNormal;
   varying float vTerritory;
+  varying float vHeat;
   varying vec2 vWorldXZ;
   void main() {
     vec3 base = vColor;
@@ -92,6 +112,17 @@ const TERRITORY_FRAGMENT = /* glsl */ `
     float front = 1.0 - smoothstep(0.0, ${(WAVE_EDGE * 0.5).toFixed(1)}, abs(distanceToOrigin - uWaveRadius));
     vec3 tinted = mix(base, uWaveColor, inside * isWave);
     tinted += front * isWave * (uWaveColor * 0.45 + vec3(0.18));
+
+    // Frente caliente: oscurecimiento y humo claro en el territorio peleado.
+    tinted *= 1.0 - ${HEAT_DARKEN.toFixed(2)} * vHeat;
+    tinted = mix(tinted, vec3(0.52, 0.48, 0.44), vHeat * ${HEAT_SMOKE.toFixed(2)});
+
+    // Brasas en los bordes: vTerritory es constante dentro de un territorio y
+    // salta en la frontera, asi que su derivada local marca el borde.
+    float edge = smoothstep(0.5, 2.0, fwidth(vTerritory));
+    float pulse = 0.55 + 0.45 * sin(uTime * 3.2 + vTerritory * 11.0 + vWorldXZ.x * 0.02);
+    vec3 ember = vec3(1.0, 0.38, 0.08);
+    tinted += edge * vHeat * pulse * ember * 0.85;
 
     float diffuse = max(dot(normalize(vNormal), normalize(uLightDirection)), 0.0);
     vec3 shaded = tinted * (uAmbient + (1.0 - uAmbient) * diffuse);
@@ -110,6 +141,7 @@ export function createTerritoryMaterial(
       uLightDirection: { value: options.lightDirection.clone().normalize() },
       uAmbient: { value: options.ambient },
       uDim: { value: 1 },
+      uTime: { value: 0 },
       uWaveTerritory: { value: -1 },
       uWaveOrigin: { value: [0, 0] },
       uWaveRadius: { value: 0 },
@@ -121,6 +153,9 @@ export function createTerritoryMaterial(
     material,
     setDim(value: number): void {
       material.uniforms['uDim']!.value = value;
+    },
+    setTime(seconds: number): void {
+      material.uniforms['uTime']!.value = seconds;
     },
     startWave(waveOptions): void {
       material.uniforms['uWaveTerritory']!.value = waveOptions.territory;

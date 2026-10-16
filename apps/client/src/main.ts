@@ -9,11 +9,12 @@
 import './styles/main.css';
 
 import type { TerritoryId } from '@conqueror/shared';
+import { DEFAULT_RULES_CONFIG } from '@conqueror/shared';
 import { LOCALE_CHANGE_EVENT, detectLocale, getLocale, setLocale, t } from './app/i18n';
 import { createMockGameState, type MockGameState } from './app/fixtures.js';
 import { playerColor } from './app/palette.js';
 import { createRenderer, type RendererHandle } from './render/renderer';
-import { createGameScene, type GameScene } from './scenes/game/GameScene';
+import { createGameScene, type AttackOddsInfo, type GameScene } from './scenes/game/GameScene';
 
 const params = new URLSearchParams(window.location.search);
 const debugActivo = params.get('debug') === '1' || params.get('debug') === 'combat';
@@ -35,6 +36,8 @@ interface AppState {
   gameState: MockGameState | null;
   selected: TerritoryId | null;
   hovered: TerritoryId | null;
+  /** Destino de ataque posible bajo el cursor, con su probabilidad. */
+  attackOdds: AttackOddsInfo | null;
   error: string | null;
   errorDetalle: string | null;
 }
@@ -44,6 +47,7 @@ const app: AppState = {
   gameState: null,
   selected: null,
   hovered: null,
+  attackOdds: null,
   error: null,
   errorDetalle: null,
 };
@@ -181,6 +185,25 @@ function panelDetalle(): HTMLElement {
     contenedor.append(vecinosBox);
   }
 
+  // Ataque apuntado: flecha en el mapa y probabilidad estimada de conquista.
+  if (app.attackOdds !== null && app.scene !== null) {
+    const origen =
+      app.scene.data.byId.get(app.attackOdds.from)?.names[getLocale()] ?? app.attackOdds.from;
+    const destino =
+      app.scene.data.byId.get(app.attackOdds.to)?.names[getLocale()] ?? app.attackOdds.to;
+    const caja = nodo('div', 'mt-3 rounded border border-grana/60 bg-grana/10 p-2');
+    caja.append(
+      nodo('p', 'text-[11px] uppercase tracking-wider text-grana', t('hud.ataque')),
+      nodo('p', 'mt-1 text-sm text-algodon', `${origen} → ${destino}`),
+      nodo(
+        'p',
+        'mt-1 text-sm font-semibold text-qolli',
+        t('hud.probabilidad', { valor: Math.round(app.attackOdds.probability * 100) }),
+      ),
+    );
+    contenedor.append(caja);
+  }
+
   return contenedor;
 }
 
@@ -248,12 +271,14 @@ function montarDepuracion(handle: RendererHandle, scene: GameScene): void {
   window.setInterval(() => {
     const stats = handle.stats();
     const contexto = handle.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
+    const apuntado = app.hovered ?? app.selected;
     lineas.textContent = [
       `${t('debug.fps')}: ${stats.fps}`,
       `${t('debug.drawcalls')}: ${stats.drawCalls}`,
       `${t('debug.triangulos')}: ${stats.triangles}`,
       `${t('debug.contexto')}: ${contexto}`,
       `${t('debug.unidades')}: ${scene.visibleUnits()}`,
+      `${t('debug.calor')}: ${apuntado === null ? '-' : scene.heatOf(apuntado).toFixed(2)}`,
       `${t('debug.seleccionado')}: ${app.selected ?? '-'}`,
       `${t('debug.apuntado')}: ${app.hovered ?? '-'}`,
     ].join('\n');
@@ -287,6 +312,7 @@ async function arrancar(): Promise<void> {
       canvas,
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       mapMaxUnits: esTactil() ? 3 : 5,
+      rules: DEFAULT_RULES_CONFIG,
     });
 
     app.scene = scene;
@@ -304,6 +330,13 @@ async function arrancar(): Promise<void> {
     scene.onSelect((id) => {
       app.selected = id;
       if (id !== null) scene.focusTerritory(id, { distance: 320, polarDeg: 44 });
+      pintar();
+    });
+
+    // El objetivo de ataque bajo el cursor cambio (o desaparecio): se refresca
+    // el panel para mostrar u ocultar la probabilidad estimada.
+    scene.onAttackOdds((info) => {
+      app.attackOdds = info;
       pintar();
     });
 

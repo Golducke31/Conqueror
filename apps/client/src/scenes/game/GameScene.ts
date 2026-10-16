@@ -12,6 +12,7 @@
 
 import type { Color } from 'three';
 import {
+  BufferAttribute,
   Group,
   LineBasicMaterial,
   LineSegments,
@@ -25,6 +26,8 @@ import {
 import gsap from 'gsap';
 
 import type { TerritoryId } from '@conqueror/shared';
+import type { RulesConfig } from '@conqueror/shared';
+import { estimateBattleOdds } from '@conqueror/rules';
 import type { MockGameState } from '../../app/fixtures.js';
 import {
   BORDER_COLOR,
@@ -38,6 +41,7 @@ import {
 } from '../../app/palette.js';
 import type { RendererHandle } from '../../render/renderer.js';
 import { createHighlightMaterial, createTerritoryMaterial } from '../../render/mapMaterials.js';
+import { createAttackArrow } from '../../render/combat/heat/attackArrow.js';
 import { NumberLayer } from '../../render/tokens/NumberLayer.js';
 import { SquadLayer } from '../../render/tokens/SquadLayer.js';
 import { buildBoard, territoryAnchors, type BoardBuild } from '../../map/boardGeometry.js';
@@ -54,6 +58,16 @@ export interface GameSceneOptions {
   readonly reducedMotion: boolean;
   /** Tope de unidades por ficha en el mapa. */
   readonly mapMaxUnits: number;
+  /** Configuracion de reglas: la usa la probabilidad de conquista estimada. */
+  readonly rules: RulesConfig;
+}
+
+/** Objetivo de ataque posible bajo el cursor, con su probabilidad estimada. */
+export interface AttackOddsInfo {
+  readonly from: TerritoryId;
+  readonly to: TerritoryId;
+  /** Probabilidad de conquista, entre 0 y 1. */
+  readonly probability: number;
 }
 
 export interface GameScene {
@@ -65,6 +79,13 @@ export interface GameScene {
   selected(): TerritoryId | null;
   hovered(): TerritoryId | null;
   onSelect(callback: (territory: TerritoryId | null) => void): void;
+  /**
+   * Se llama cuando cambia el destino de ataque posible bajo el cursor (o
+   * `null` cuando no hay ninguno): destino enemigo vecino del territorio
+   * propio seleccionado. Lleva la probabilidad estimada de conquista, para que
+   * el HUD la muestre junto con el detalle del territorio.
+   */
+  onAttackOdds(callback: (info: AttackOddsInfo | null) => void): void;
   focusTerritory(territory: TerritoryId, options?: FocusOptions): void;
   /** Encuadra un punto del tablero en coordenadas de mundo. */
   focusPoint(x: number, z: number, options?: FocusOptions): void;
@@ -99,6 +120,14 @@ export interface GameScene {
   }): gsap.core.Timeline;
   /** Fuerza la onda a su estado final, para cuando se salta la animacion. */
   finishOwnershipWave(): void;
+  /**
+   * Frente caliente: escribe el calor por territorio (0..1) en el atributo
+   * `aHeat`. Los territorios que faltan en el mapa quedan en cero. Los valores
+   * los deriva la aplicacion del log de eventos (heat/heatModel.ts).
+   */
+  setHeat(values: ReadonlyMap<TerritoryId, number>): void;
+  /** Calor actual de un territorio, para el overlay de depuracion. */
+  heatOf(territory: TerritoryId): number;
   update(deltaSeconds: number): void;
   dispose(): void;
 }
@@ -121,6 +150,16 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
     borderColor: BORDER_COLOR,
     seaRouteColor: SEA_ROUTE_COLOR,
   });
+
+  // Frente caliente: atributo por vertice, 0..1 por territorio. Lo escribe
+  // `setHeat` con los valores que la aplicacion deriva del log de eventos
+  // (render/combat/heat/heatModel.ts). El shader lo usa para oscurecer, echar
+  // humo y prender brasas en los bordes.
+  const heatAttribute = new BufferAttribute(
+    new Float32Array(board.map.getAttribute('position')?.count ?? 0),
+    1,
+  );
+  board.map.setAttribute('aHeat', heatAttribute);
 
   const group = new Group();
 
@@ -187,7 +226,23 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
   const numbers = new NumberLayer();
   numbers.group.renderOrder = 5;
 
-  group.add(ocean, mapMesh, highlightMesh, borders, seaRoutes, squads.group, numbers.group);
+  // Flecha de avance (mapa vivo): aparece al apuntar un vecino enemigo con un
+  // territorio propio seleccionado. Con movimiento reducido se muestra quieta.
+  const attackArrow = createAttackArrow({
+    renderer: options.renderer,
+    reducedMotion: options.reducedMotion,
+  });
+
+  group.add(
+    ocean,
+    mapMesh,
+    highlightMesh,
+    borders,
+    seaRoutes,
+    squads.group,
+    numbers.group,
+    attackArrow.group,
+  );
 
   const camera = options.renderer.camera;
   const rig = createCameraRig({
@@ -212,11 +267,82 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
   let hoveredTerritory: TerritoryId | null = null;
   let selectedTerritory: TerritoryId | null = null;
   const selectListeners = new Set<(territory: TerritoryId | null) => void>();
+  const oddsListeners = new Set<(info: AttackOddsInfo | null) => void>();
+  /** Ultima informacion de ataque publicada, para no repetir el aviso. */
+  let lastOddsKey = '';
 
   const refreshHighlight = (): void => {
     highlightMaterial.setHover(picker.indexOf(hoveredTerritory ?? ''));
     highlightMaterial.setSelected(picker.indexOf(selectedTerritory ?? ''));
+    refreshAttackArrow();
     options.renderer.requestRender();
+  };
+
+  /**
+   * Flecha de avance y probabilidad estimada. Se muestra solo si:
+   *   - hay un territorio propio seleccionado con ejercitos de sobra,
+   *   - el cursor apunta a un vecino de otro jugador.
+   * La probabilidad es informacion publica: la calcula el motor de reglas
+   * (estimateBattleOdds) y no decide nada.
+   */
+  const refreshAttackArrow = (): void => {
+    const from = selectedTerritory;
+    const to = hoveredTerritory;
+    const state = gameState;
+
+    const publish = (info: AttackOddsInfo | null): void => {
+      const key = info === null ? '' : `${info.from}|${info.to}|${info.probability}`;
+      if (key === lastOddsKey) return;
+      lastOddsKey = key;
+      for (const listener of oddsListeners) listener(info);
+    };
+
+    const hide = (): void => {
+      attackArrow.hide();
+      publish(null);
+    };
+
+    if (state === null || from === null || to === null || from === to) {
+      hide();
+      return;
+    }
+
+    const fromState = state.territories[from];
+    const toState = state.territories[to];
+    const neighbors = data.adjacency.byTerritory[from] ?? [];
+    const canAttack =
+      fromState !== undefined &&
+      toState !== undefined &&
+      fromState.owner === state.activePlayer &&
+      fromState.armies > options.rules.combat.minArmiesPerTerritory &&
+      toState.owner !== null &&
+      toState.owner !== state.activePlayer &&
+      neighbors.includes(to);
+
+    const activePlayer = state.players.find((player) => player.id === state.activePlayer);
+    const anchorFrom = anchors.get(from);
+    const anchorTo = anchors.get(to);
+
+    if (
+      !canAttack ||
+      activePlayer === undefined ||
+      anchorFrom === undefined ||
+      anchorTo === undefined
+    ) {
+      hide();
+      return;
+    }
+
+    const odds = estimateBattleOdds(fromState.armies, toState.armies, options.rules);
+    attackArrow.show({
+      fromX: anchorFrom.x,
+      fromZ: anchorFrom.z,
+      toX: anchorTo.x,
+      toZ: anchorTo.z,
+      baseY: board.relief,
+      color: playerColor(activePlayer.color),
+    });
+    publish({ from, to, probability: odds.winProbability });
   };
 
   const toPointer = (event: PointerEvent): void => {
@@ -275,6 +401,9 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
 
   /** Timeline de la onda en curso, para poder forzarla al saltar. */
   let waveTimeline: gsap.core.Timeline | null = null;
+
+  /** Ultimo calor conocido por territorio (para `heatOf` y la depuracion). */
+  let heatValues = new Map<TerritoryId, number>();
 
   const rebuildTokens = (): void => {
     if (gameState === null) return;
@@ -353,6 +482,10 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
 
     onSelect(callback: (territory: TerritoryId | null) => void): void {
       selectListeners.add(callback);
+    },
+
+    onAttackOdds(callback: (info: AttackOddsInfo | null) => void): void {
+      oddsListeners.add(callback);
     },
 
     focusTerritory(territory: TerritoryId, focusOptions?: FocusOptions): void {
@@ -449,10 +582,33 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
       waveTimeline = null;
     },
 
+    setHeat(values: ReadonlyMap<TerritoryId, number>): void {
+      heatValues = new Map(values);
+      // Los rangos de vertices por territorio ya estan calculados para los
+      // colores: el calor se escribe con el mismo recorrido. Los territorios
+      // que no estan en el mapa de valores vuelven a cero (el calor decae).
+      board.territoryIds.forEach((id, index) => {
+        const value = Math.min(1, Math.max(0, values.get(id) ?? 0));
+        const from = vertexRanges[index * 2] ?? 0;
+        const to = vertexRanges[index * 2 + 1] ?? 0;
+        for (let vertex = from; vertex < to; vertex += 1) {
+          heatAttribute.setX(vertex, value);
+        }
+      });
+      heatAttribute.needsUpdate = true;
+      options.renderer.requestRender();
+    },
+
+    heatOf(territory: TerritoryId): number {
+      return heatValues.get(territory) ?? 0;
+    },
+
     update(deltaSeconds: number): void {
       elapsed += deltaSeconds;
       squads.setTime(elapsed);
       rig.update(deltaSeconds);
+      // El pulso de las brasas del frente caliente corre con el mismo reloj.
+      territoryMaterial.setTime(elapsed);
 
       const distance = camera.position.distanceTo(rig.controls.target);
       numbers.setZoomScale(Math.max(0.35, Math.min(2.4, distance / LABEL_REFERENCE_DISTANCE)));
@@ -472,6 +628,8 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
       options.canvas.removeEventListener('pointerup', onPointerUp);
       options.canvas.removeEventListener('pointerleave', onPointerLeave);
       selectListeners.clear();
+      oddsListeners.clear();
+      attackArrow.dispose();
       squads.dispose();
       numbers.dispose();
       highlightMaterial.dispose();

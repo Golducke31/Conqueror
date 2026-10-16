@@ -159,4 +159,5 @@ export function getLegalCommands(_state: GameState, _playerId: string): readonly
   throw new Error('getLegalCommands(): no implementado todavia (Hito 3 - motor de reglas)');
 }
 
+export * from './battle-odds.js';
 export * from './compose-squad.js';

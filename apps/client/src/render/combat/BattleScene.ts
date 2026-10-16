@@ -46,6 +46,7 @@ import { DiceLayer, type DiePlacement } from './dice/DiceLayer.js';
 import { ParticlePool, type ParticleBurst } from './fx/ParticlePool.js';
 import { createBannerLayer } from './BannerLayer.js';
 import { ShipLayer } from './units/ShipLayer.js';
+import { createQualityController } from './choreography/quality.js';
 
 /** Separacion entre la linea de frente y cada escuadra. */
 const LINE_GAP = 30;
@@ -184,6 +185,25 @@ export interface BattleScene {
   isOpen(): boolean;
   setTime(seconds: number): void;
   tick(deltaSeconds: number): void;
+  /**
+   * Muestreo de FPS para la calidad adaptativa. Lo llama el director mientras
+   * la batalla está abierta: si el promedio cae por debajo del umbral, se
+   * reducen solas las partículas y las unidades visibles.
+   */
+  recordFrame(deltaSeconds: number): void;
+  /**
+   * Ajuste MANUAL de calidad (lo usa el sandbox para forzar la calidad
+   * reducida). Suspende el ajuste automático hasta `setAdaptiveQuality(true)`.
+   */
+  setQuality(state: { readonly unitCap: number; readonly particleScale: number }): void;
+  /** Reactiva el ajuste automático de calidad (activado por defecto). */
+  setAdaptiveQuality(enabled: boolean): void;
+  /** Estado de calidad efectivo, para el panel de depuración. */
+  quality(): {
+    readonly degraded: boolean;
+    readonly unitCap: number;
+    readonly particleScale: number;
+  };
   visibleUnits(): number;
   visibleShips(): number;
   attackerRoster(): readonly UnitType[];
@@ -252,6 +272,30 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
   /** Estandarte plantado durante la secuencia de conquista. */
   let bannerPlanted = false;
 
+  // --- Calidad adaptativa ---------------------------------------------------
+  // El controlador muestrea los frames que le pasa el director. Un ajuste
+  // manual (sandbox) tiene prioridad y suspende el automático.
+  const qualityController = createQualityController({
+    unitCap: options.maxUnits,
+    particleScale: 1,
+  });
+  let qualityManual: { readonly unitCap: number; readonly particleScale: number } | null = null;
+  let qualityAuto = true;
+
+  /** Tope de unidades por bando efectivo. */
+  const currentUnitCap = (): number =>
+    qualityManual?.unitCap ?? qualityController.snapshot().unitCap;
+
+  /** Multiplicador de partículas efectivo (1 = escala del perfil). */
+  const currentParticleFactor = (): number =>
+    qualityManual?.particleScale ?? qualityController.snapshot().particleScale;
+
+  /** Tope de unidades en la marcha, escalado por la calidad. */
+  const currentMarchCap = (): number => {
+    const ratio = currentUnitCap() / Math.max(1, options.maxUnits);
+    return Math.max(2, Math.min(MARCH_MAX_UNITS, Math.floor(MARCH_MAX_UNITS * ratio)));
+  };
+
   const attackerDicePos: Vector3[] = [];
   const defenderDicePos: Vector3[] = [];
 
@@ -259,10 +303,16 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
   const applyInstances = (): void => {
     if (attackerSide === null && defenderSide === null && marchTl === null) return;
     const instances: UnitInstance[] = [];
+    // La calidad adaptativa puede ocultar las unidades de atras de la formacion:
+    // se dibujan las primeras `cap` de cada bando, en orden de formacion.
+    const cap = currentUnitCap();
 
     const build = (side: BattleSideInternal): void => {
+      let shown = 0;
       for (const unit of side.units) {
         if (!unit.alive && unit.fallen < 0.001) continue;
+        if (shown >= cap) break;
+        shown += 1;
         const px =
           unit.start.x +
           (unit.base.x - unit.start.x) * deployProgress +
@@ -305,7 +355,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     /** Si se pasa, las unidades arrancan alrededor de este punto (desembarco). */
     startCenter?: Vector3,
   ): BattleSideInternal => {
-    const composition = composeSquad(side.armies, { maxUnits: options.maxUnits });
+    const composition = composeSquad(side.armies, { maxUnits: currentUnitCap() });
     if (composition.units.length === 0) {
       return { color: side.color, units: [], center, dir };
     }
@@ -390,6 +440,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     at: Vector3,
     scale: number,
   ): void => {
+    // La calidad adaptativa puede recortar la cantidad de partículas.
+    scale *= currentParticleFactor();
     const neutral = new ThreeColor(0xb9a07a);
     const spark = new ThreeColor(0xffd27a);
     const smoke = new ThreeColor(0x9aa3b2);
@@ -479,7 +531,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       x: at.x,
       y: at.y + 1,
       z: at.z,
-      count: Math.round(10 * scale),
+      count: Math.round(10 * scale * currentParticleFactor()),
       spread: 7,
       speed: 4,
       color: new ThreeColor(0xffb347),
@@ -515,7 +567,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     const sailRight = new Vector3(sailDir.z, 0, -sailDir.x);
 
     // Un navio por unidad de artilleria de la escuadra, minimo uno.
-    const composition = composeSquad(attackerArmies, { maxUnits: options.maxUnits });
+    const composition = composeSquad(attackerArmies, { maxUnits: currentUnitCap() });
     const artilleryUnits = composition.units.find((unit) => unit.type === 'artillery')?.count ?? 0;
     const shipCount = Math.max(1, artilleryUnits);
 
@@ -954,7 +1006,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     },
 
     playMarch(marchOptions: MarchOptions): gsap.core.Timeline {
-      const count = Math.max(1, Math.min(MARCH_MAX_UNITS, Math.floor(marchOptions.count)));
+      const marchCap = currentMarchCap();
+      const count = Math.max(1, Math.min(marchCap, Math.floor(marchOptions.count)));
       const from = new Vector3(marchOptions.fromX, baseY, marchOptions.fromZ);
       const to = new Vector3(marchOptions.toX, baseY, marchOptions.toZ);
       const dir = to.clone().sub(from).setY(0);
@@ -988,7 +1041,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
         x: from.x,
         y: baseY + 0.5,
         z: from.z,
-        count: Math.round(10 * marchOptions.profile.particleScale),
+        count: Math.round(10 * marchOptions.profile.particleScale * currentParticleFactor()),
         spread: 8,
         speed: 3,
         color: new ThreeColor(0xb9a07a),
@@ -1043,7 +1096,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
               x: from.x + (to.x - from.x) * state.t,
               y: baseY + 0.3,
               z: from.z + (to.z - from.z) * state.t,
-              count: 3,
+              count: Math.max(1, Math.round(3 * currentParticleFactor())),
               spread: 5,
               speed: 1.5,
               color: new ThreeColor(0xb9a07a),
@@ -1118,6 +1171,49 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       batch.setTime(seconds);
       ships.setTime(seconds);
       banner.setTime(seconds);
+    },
+
+    recordFrame(deltaSeconds: number): void {
+      if (!qualityAuto || qualityManual !== null) return;
+      const before = qualityController.snapshot().degraded;
+      qualityController.recordFrame(deltaSeconds);
+      if (qualityController.snapshot().degraded !== before) {
+        // El tope de unidades cambió a mitad de la batalla: refrescar ya.
+        applyInstances();
+        options.renderer.requestRender();
+      }
+    },
+
+    setQuality(state: { readonly unitCap: number; readonly particleScale: number }): void {
+      qualityManual = {
+        unitCap: Math.max(1, Math.floor(state.unitCap)),
+        particleScale: Math.max(0, state.particleScale),
+      };
+      applyInstances();
+      options.renderer.requestRender();
+    },
+
+    setAdaptiveQuality(enabled: boolean): void {
+      qualityAuto = enabled;
+      if (!enabled) return;
+      qualityManual = null;
+      qualityController.reset();
+      applyInstances();
+      options.renderer.requestRender();
+    },
+
+    quality(): {
+      readonly degraded: boolean;
+      readonly unitCap: number;
+      readonly particleScale: number;
+    } {
+      const unitCap = currentUnitCap();
+      const particleScale = currentParticleFactor();
+      return {
+        degraded: unitCap < options.maxUnits || particleScale < 1,
+        unitCap,
+        particleScale,
+      };
     },
 
     tick(deltaSeconds: number): void {

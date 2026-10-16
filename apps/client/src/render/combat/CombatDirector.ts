@@ -335,6 +335,9 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
       elapsed += deltaSeconds;
       options.battle.setTime(elapsed);
       options.battle.tick(deltaSeconds);
+      // Calidad adaptativa: se muestrea solo mientras hay batalla abierta.
+      // Si el promedio de FPS cae, la escena reduce partículas y unidades.
+      if (options.battle.isOpen()) options.battle.recordFrame(deltaSeconds);
       if (!running) processNext();
     },
 

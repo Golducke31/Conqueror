@@ -18,6 +18,8 @@ import '../styles/main.css';
 
 import { Color } from 'three';
 import type { BattleRoundResolved, GameEvent } from '@conqueror/rules';
+import { estimateBattleOdds } from '@conqueror/rules';
+import { DEFAULT_RULES_CONFIG } from '@conqueror/shared';
 import { pairKey } from '@conqueror/map-data';
 import { t } from '../app/i18n.js';
 import { createMockGameState, createSeededRandom, type MockGameState } from '../app/fixtures.js';
@@ -26,6 +28,7 @@ import { createRenderer } from '../render/renderer.js';
 import { createBattleScene } from '../render/combat/BattleScene.js';
 import { createCombatDirector } from '../render/combat/CombatDirector.js';
 import { SPECTACLE_PROFILES, type SpectacleLevel } from '../render/combat/spectacle.js';
+import { createHeatModel } from '../render/combat/heat/heatModel.js';
 import { createGameScene } from '../scenes/game/GameScene.js';
 
 function nodo(etiqueta: string, clase: string, texto?: string): HTMLElement {
@@ -107,6 +110,7 @@ async function main(): Promise<void> {
     canvas,
     reducedMotion: false,
     mapMaxUnits: 5,
+    rules: DEFAULT_RULES_CONFIG,
   });
   renderer.scene.add(scene.group);
 
@@ -118,6 +122,13 @@ async function main(): Promise<void> {
     seed: 4242,
   });
   scene.setGameState(gameState);
+
+  // Frente caliente: se deriva del log de eventos (acá, los simulados) y se
+  // refleja en el shader del tablero. Es solo visual.
+  const heat = createHeatModel();
+  const aplicarCalor = (eventos: readonly GameEvent[]): void => {
+    if (heat.apply(eventos)) scene.setHeat(new Map(heat.entries()));
+  };
 
   const battle = createBattleScene({ renderer, scene, maxUnits: 16 });
   renderer.scene.add(battle.group);
@@ -238,6 +249,17 @@ async function main(): Promise<void> {
   }
   selectorNivel.value = 'tactical';
 
+  // Calidad reducida forzada: sirve para VER la calidad adaptativa sin tener
+  // que esperar a que baje el FPS de verdad.
+  const checkCalidad = document.createElement('input');
+  checkCalidad.type = 'checkbox';
+  checkCalidad.className = 'h-3.5 w-3.5 accent-grana';
+  const filaCalidad = nodo(
+    'label',
+    'col-span-2 flex items-center gap-2 text-[11px] text-algodon/60',
+  );
+  filaCalidad.append(checkCalidad, nodo('span', '', t('sandbox.calidadForzada')));
+
   const campo = (label: string, control: HTMLElement): HTMLElement => {
     const box = nodo('label', 'flex flex-col gap-1');
     box.append(
@@ -253,6 +275,7 @@ async function main(): Promise<void> {
     campo(t('sandbox.atacante'), inputAtacante),
     campo(t('sandbox.defensor'), inputDefensor),
     campo(t('sandbox.nivel'), selectorNivel),
+    filaCalidad,
   );
   panel.append(grid);
 
@@ -323,6 +346,25 @@ async function main(): Promise<void> {
         `${nombreDe(lastRound.from)}: ${lastRound.attackerArmiesAfter} · ${nombreDe(lastRound.to)}: ${lastRound.defenderArmiesAfter}`,
       );
     }
+    // Probabilidad estimada de conquista con los ejércitos elegidos: la calcula
+    // el motor de reglas (cadena de Markov exacta) y no decide nada.
+    const atacante = Math.max(2, Number(inputAtacante.value) || 2);
+    const defensor = Math.max(1, Number(inputDefensor.value) || 1);
+    const odds = estimateBattleOdds(atacante, defensor, DEFAULT_RULES_CONFIG);
+    lineas.push(`${t('sandbox.probabilidad')}: ${Math.round(odds.winProbability * 100)}%`);
+    // Calor del frente elegido: lo deriva el modelo del log de eventos y lo
+    // consume el shader del tablero (oscurecer, humo y brasas en los bordes).
+    lineas.push(
+      `${t('debug.calor')}: ${(heat.get(selectorOrigen.value) ?? 0).toFixed(2)} / ${(
+        heat.get(selectorDestino.value) ?? 0
+      ).toFixed(2)}`,
+    );
+    // Calidad efectiva (automática por FPS o forzada por el casillero).
+    const calidad = battle.quality();
+    lineas.push(
+      `${t('sandbox.calidad')}: ${calidad.degraded ? t('sandbox.calidad.reducida') : t('sandbox.calidad.plena')}` +
+        ` (${calidad.unitCap} u, x${calidad.particleScale.toFixed(2)})`,
+    );
     info.textContent = lineas.join('\n');
     info.style.whiteSpace = 'pre-line';
 
@@ -395,8 +437,23 @@ async function main(): Promise<void> {
     actualizarPanel();
   });
 
+  // Cambiar los ejércitos actualiza la probabilidad estimada del panel.
+  inputAtacante.addEventListener('change', () => actualizarPanel());
+  inputDefensor.addEventListener('change', () => actualizarPanel());
+
   selectorNivel.addEventListener('change', () => {
     director.setLevel(selectorNivel.value as SpectacleLevel);
+  });
+
+  checkCalidad.addEventListener('change', () => {
+    if (checkCalidad.checked) {
+      // Manual: unidades y partículas recortadas, automático suspendido.
+      battle.setAdaptiveQuality(false);
+      battle.setQuality({ unitCap: 4, particleScale: 0.3 });
+    } else {
+      battle.setAdaptiveQuality(true);
+    }
+    actualizarPanel();
   });
 
   botonRonda.addEventListener('click', () => {
@@ -415,6 +472,7 @@ async function main(): Promise<void> {
     if (event.defenderArmiesAfter === 0) {
       eventos.push({ type: 'TERRITORY_CONQUERED', territory: to });
     }
+    aplicarCalor(eventos);
     director.enqueue(eventos);
   });
 
@@ -445,7 +503,9 @@ async function main(): Promise<void> {
       attackerArmiesAfter: Math.max(2, fromState.armies),
       defenderArmiesAfter: 0,
     };
-    director.enqueue([event, { type: 'TERRITORY_CONQUERED', territory: to }]);
+    const eventos: GameEvent[] = [event, { type: 'TERRITORY_CONQUERED', territory: to }];
+    aplicarCalor(eventos);
+    director.enqueue(eventos);
   });
 
   botonMover.addEventListener('click', () => {
@@ -512,6 +572,8 @@ async function main(): Promise<void> {
       seed: 4242,
     });
     scene.setGameState(gameState);
+    heat.reset();
+    scene.setHeat(new Map());
     lastRound = null;
     conquista = null;
     marching = false;
