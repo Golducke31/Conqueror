@@ -15,6 +15,8 @@ export interface UnitMaterialHandle {
   readonly material: ShaderMaterial;
   setTime(seconds: number): void;
   setDim(value: number): void;
+  /** Opacidad global del lote, para fundidos (conquista, cierres). */
+  setOpacity(value: number): void;
   dispose(): void;
 }
 
@@ -79,6 +81,9 @@ export function createUnitMaterial(): UnitMaterialHandle {
     },
     setDim(value: number): void {
       material.uniforms['uDim']!.value = value;
+    },
+    setOpacity(value: number): void {
+      material.uniforms['uOpacity']!.value = Math.max(0, Math.min(1, value));
     },
     dispose(): void {
       material.dispose();

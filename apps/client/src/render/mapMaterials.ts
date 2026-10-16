@@ -7,6 +7,13 @@
  *
  * `uDim` es la atenuacion del mapa: el plan de combate pide oscurecer el resto
  * del mundo mientras se juega una batalla.
+ *
+ * La ONDA DE CAMBIO DE DUENO tambien vive aca, como uniformes del mismo
+ * material (el plan pide expresamente "no crear materiales nuevos"): un barrido
+ * radial desde el punto del frente va tiñendo SOLO el territorio conquistado,
+ * del color anterior (que sigue en los atributos por vertice) al del dueno
+ * nuevo. Cuando la onda termina, `setGameState` reescribe los atributos con el
+ * color definitivo y la onda se apaga: el corte es invisible.
  */
 
 import type { Color, Vector3 } from 'three';
@@ -23,19 +30,42 @@ export interface TerritoryMaterialHandle {
   readonly material: ShaderMaterial;
   /** Atenuacion global, 0 = negro, 1 = normal. */
   setDim(value: number): void;
+  /**
+   * Arranca la onda de cambio de dueno sobre un territorio.
+   * El radio arranca en 0; quien anima llama a `setWaveRadius`.
+   */
+  startWave(options: {
+    /** Indice del territorio en la malla (`aTerritory`). */
+    readonly territory: number;
+    /** Origen del barrido, en coordenadas de mundo (XZ). */
+    readonly originX: number;
+    readonly originZ: number;
+    /** Color del dueno nuevo. */
+    readonly color: Color;
+  }): void;
+  /** Radio actual del barrido, en unidades de mundo. */
+  setWaveRadius(value: number): void;
+  /** Apaga la onda (por ejemplo al terminar o al saltar). */
+  clearWave(): void;
   dispose(): void;
 }
+
+/** Ancho del borde brillante del frente de la onda. */
+const WAVE_EDGE = 26;
 
 const TERRITORY_VERTEX = /* glsl */ `
   attribute float aTerritory;
   varying vec3 vColor;
   varying vec3 vNormal;
   varying float vTerritory;
+  varying vec2 vWorldXZ;
   void main() {
     vColor = color;
     vNormal = normalize(normalMatrix * normal);
     vTerritory = aTerritory;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 world = modelMatrix * vec4(position, 1.0);
+    vWorldXZ = world.xz;
+    gl_Position = projectionMatrix * viewMatrix * world;
   }
 `;
 
@@ -43,11 +73,28 @@ const TERRITORY_FRAGMENT = /* glsl */ `
   uniform vec3 uLightDirection;
   uniform float uAmbient;
   uniform float uDim;
+  uniform float uWaveTerritory;
+  uniform vec2 uWaveOrigin;
+  uniform float uWaveRadius;
+  uniform vec3 uWaveColor;
   varying vec3 vColor;
   varying vec3 vNormal;
+  varying float vTerritory;
+  varying vec2 vWorldXZ;
   void main() {
+    vec3 base = vColor;
+
+    // Onda de cambio de dueno: solo actua sobre el territorio conquistado.
+    float isWave = step(abs(vTerritory - uWaveTerritory), 0.5);
+    float distanceToOrigin = distance(vWorldXZ, uWaveOrigin);
+    float inside = 1.0 - smoothstep(uWaveRadius - ${WAVE_EDGE.toFixed(1)}, uWaveRadius, distanceToOrigin);
+    // El frente de la onda brilla levemente, con el color del dueno nuevo.
+    float front = 1.0 - smoothstep(0.0, ${(WAVE_EDGE * 0.5).toFixed(1)}, abs(distanceToOrigin - uWaveRadius));
+    vec3 tinted = mix(base, uWaveColor, inside * isWave);
+    tinted += front * isWave * (uWaveColor * 0.45 + vec3(0.18));
+
     float diffuse = max(dot(normalize(vNormal), normalize(uLightDirection)), 0.0);
-    vec3 shaded = vColor * (uAmbient + (1.0 - uAmbient) * diffuse);
+    vec3 shaded = tinted * (uAmbient + (1.0 - uAmbient) * diffuse);
     gl_FragColor = vec4(shaded * uDim, 1.0);
   }
 `;
@@ -63,6 +110,10 @@ export function createTerritoryMaterial(
       uLightDirection: { value: options.lightDirection.clone().normalize() },
       uAmbient: { value: options.ambient },
       uDim: { value: 1 },
+      uWaveTerritory: { value: -1 },
+      uWaveOrigin: { value: [0, 0] },
+      uWaveRadius: { value: 0 },
+      uWaveColor: { value: [1, 1, 1] },
     },
   });
 
@@ -70,6 +121,23 @@ export function createTerritoryMaterial(
     material,
     setDim(value: number): void {
       material.uniforms['uDim']!.value = value;
+    },
+    startWave(waveOptions): void {
+      material.uniforms['uWaveTerritory']!.value = waveOptions.territory;
+      material.uniforms['uWaveOrigin']!.value = [waveOptions.originX, waveOptions.originZ];
+      material.uniforms['uWaveColor']!.value = [
+        waveOptions.color.r,
+        waveOptions.color.g,
+        waveOptions.color.b,
+      ];
+      material.uniforms['uWaveRadius']!.value = 0;
+    },
+    setWaveRadius(value: number): void {
+      material.uniforms['uWaveRadius']!.value = Math.max(0, value);
+    },
+    clearWave(): void {
+      material.uniforms['uWaveTerritory']!.value = -1;
+      material.uniforms['uWaveRadius']!.value = 0;
     },
     dispose(): void {
       material.dispose();

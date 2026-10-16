@@ -8,7 +8,13 @@
  *   - La presentacion NUNCA decide nada: los numeros ya vienen resueltos.
  *   - La escena de batalla se abre en la primera ronda de un par origen/destino
  *     y sigue abierta mientras el atacante tire contra el mismo objetivo.
- *   - Siempre saltable: clic, Espacio o Esc.
+ *   - La CONQUISTA (C3) tiene coreografia propia sobre la escena abierta:
+ *     avance de la escuadra, estandarte y onda de cambio de dueno. El estado
+ *     se aplica cuando la ONDA termina: desde ahi el tablero ya muestra el
+ *     color del dueno nuevo, y recien entonces `setGameState` reescribe los
+ *     atributos por vertice con ese mismo color.
+ *   - Siempre saltable: clic, Espacio o Esc. Al saltar se fuerzan las
+ *     timelines (onda y marcha incluidas) y se aplican los estados pendientes.
  *   - Si se acumulan mas de 5 rondas, ese tramo se comprime a "Rapido".
  *   - El HUD del atacante no habilita un ataque nuevo hasta terminar o saltar.
  */
@@ -28,6 +34,7 @@ import {
   type SpectacleLevel,
   type SpectacleProfile,
 } from './spectacle.js';
+import { planConquest } from './choreography/conquest.js';
 
 /** A partir de cuantas rondas pendientes se comprime el tramo. */
 const COMPRESS_THRESHOLD = 5;
@@ -48,6 +55,12 @@ export interface CombatDirectorOptions {
   ) => { readonly x: number; readonly z: number } | undefined;
   /** Se llama cuando una ronda ya termino de contarse. */
   readonly onRoundApplied: (event: BattleRoundResolved) => void;
+  /**
+   * Se llama cuando la onda de cambio de dueno termina (o se salta). Recien
+   * aca la aplicacion debe aplicar el nuevo dueno: antes, el tablero muestra
+   * el color nuevo de la onda pero los atributos siguen con el viejo.
+   */
+  readonly onConquered: (territory: TerritoryId) => void;
 }
 
 export interface CombatDirector {
@@ -63,6 +76,10 @@ export interface CombatDirector {
   dispose(): void;
 }
 
+/** Clave del frente entre dos territorios, en el orden que usa el mapa. */
+const frontKeyOf = (from: TerritoryId, to: TerritoryId): string =>
+  from < to ? `${from}|${to}` : `${to}|${from}`;
+
 export function createCombatDirector(options: CombatDirectorOptions): CombatDirector {
   let level = options.level;
   let spectator = false;
@@ -71,6 +88,8 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
   let running = false;
   /** Par origen/destino de la escena abierta. */
   let openPair: { readonly from: TerritoryId; readonly to: TerritoryId } | null = null;
+  /** Ultimo par batallado: la conquista se coreografia sobre el. */
+  let lastPair: { readonly from: TerritoryId; readonly to: TerritoryId } | null = null;
   let elapsed = 0;
   const idleListeners = new Set<() => void>();
 
@@ -89,6 +108,7 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
 
   const playRound = (event: BattleRoundResolved): void => {
     const profile = profileFor();
+    lastPair = { from: event.from, to: event.to };
     const pairChanged =
       openPair === null || openPair.from !== event.from || openPair.to !== event.to;
 
@@ -108,9 +128,7 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
       const defenderArmies = options.armiesOf(event.to);
       const attackerAnchor = options.anchorOf(event.from);
       const defenderAnchor = options.anchorOf(event.to);
-      const front = options.scene.data.frontByPair.get(
-        event.from < event.to ? `${event.from}|${event.to}` : `${event.to}|${event.from}`,
-      );
+      const front = options.scene.data.frontByPair.get(frontKeyOf(event.from, event.to));
 
       if (front !== undefined && attackerAnchor !== undefined && defenderAnchor !== undefined) {
         const openTl = options.battle.open({
@@ -144,6 +162,85 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
     current = timeline;
   };
 
+  /**
+   * Secuencia de conquista sobre la escena de batalla abierta: avance de la
+   * escuadra atacante al territorio, plantado del estandarte, onda de cambio
+   * de dueno y cierre de la escena. Devuelve la timeline, o `null` si no hay
+   * contexto para coreografiarla (en ese caso el estado se aplica directo).
+   */
+  const playConquest = (
+    event: Extract<GameEvent, { readonly type: 'TERRITORY_CONQUERED' }>,
+  ): gsap.core.Timeline | null => {
+    const pair = lastPair;
+    if (pair === null || openPair === null) {
+      // Sin una batalla en curso no hay nada que animar.
+      options.onConquered(event.territory);
+      return null;
+    }
+
+    const from = pair.from;
+    const to = pair.to;
+    const front = options.scene.data.frontByPair.get(frontKeyOf(from, to));
+    const anchor = options.anchorOf(to);
+    const territoryIndex = options.scene.territoryIndex(to);
+    const profile = profileFor();
+
+    if (front === undefined || anchor === undefined || territoryIndex === undefined) {
+      // Faltan piezas del mapa: se cierra y se aplica el estado sin mas.
+      openPair = null;
+      options.battle.close({ instant: true });
+      options.onConquered(event.territory);
+      return null;
+    }
+
+    // El barrido de la onda arranca en el punto del frente.
+    const frontWorld = options.scene.board.projection.toWorld(front.point[0], front.point[1]);
+    const coverRadius = options.scene.coverRadiusFrom(to, frontWorld.x, frontWorld.z) ?? 60;
+    // Cuando termina la onda el tablero ya muestra el dueno nuevo: ahi se
+    // aplica el estado (ver GameScene.playOwnershipWave).
+    const plan = planConquest({ timing: profile.conquest });
+    const waveEnd = plan.wave.start + plan.wave.duration;
+
+    openPair = null;
+
+    // El perfil cinematico corre la conquista en camara lenta.
+    const timeline = gsap.timeline({
+      timeScale: profile.conquestTimeScale,
+      onComplete: () => {
+        current = null;
+        lastPair = null;
+        running = false;
+        // La escena se cierra recien ahora, con el estandarte plantado: marca
+        // el territorio recien conquistado hasta que se haga la marcha.
+        // (No se encadena antes: `close` evalua su estado al llamarlo, y al
+        // terminar la conquista el estandarte ya existe.)
+        options.battle.close({ instant: true, keepBanner: true });
+        finishIdle();
+      },
+    });
+
+    timeline.call(() => options.onConquered(event.territory), undefined, waveEnd);
+
+    const conquestTl = options.battle.playConquest({
+      target: {
+        territory: to,
+        territoryIndex,
+        // El dueno nuevo es el atacante: el defensor ya quedo en cero.
+        color: options.colorOf(from),
+        anchorX: anchor.x,
+        anchorZ: anchor.z,
+        coverRadius,
+      },
+      waveOriginX: frontWorld.x,
+      waveOriginZ: frontWorld.z,
+      profile,
+    });
+    timeline.add(conquestTl, 0);
+
+    options.renderer.setContinuous(true);
+    return timeline;
+  };
+
   const processNext = (): void => {
     if (running) return;
     const next = queue.shift();
@@ -164,16 +261,9 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
     }
 
     if (next.type === 'TERRITORY_CONQUERED') {
-      // En C3 la conquista tiene su propia coreografia. Por ahora cierra.
-      openPair = null;
-      const timeline = gsap.timeline({
-        onComplete: () => {
-          current = null;
-          running = false;
-        },
-      });
-      timeline.add(options.battle.close());
-      current = timeline;
+      const conquestTl = playConquest(next);
+      if (conquestTl === null) running = false;
+      else current = conquestTl;
       return;
     }
 
@@ -197,18 +287,30 @@ export function createCombatDirector(options: CombatDirectorOptions): CombatDire
     },
 
     skip(): void {
-      // Se cierra la timeline en curso y se dan por contadas las pendientes.
-      if (current !== null) {
-        current.progress(1);
-        current.kill();
-        current = null;
+      // La timeline en curso se fuerza a su final: sus callbacks (onda de
+      // dueno y aplicacion de estados incluidos) se disparan en el acto.
+      // Se copia la referencia primero: el onComplete la pone en null.
+      const active = current;
+      current = null;
+      if (active !== null) {
+        active.progress(1);
+        active.kill();
       }
+
+      // La onda puede quedar a medias si la conquista recien arrancaba.
+      options.scene.finishOwnershipWave();
+
+      // Las pendientes se dan por contadas, en orden.
       for (const event of queue) {
         if (event.type === 'BATTLE_ROUND_RESOLVED') options.onRoundApplied(event);
+        else if (event.type === 'TERRITORY_CONQUERED') options.onConquered(event.territory);
       }
       queue = [];
+      lastPair = null;
       running = false;
       openPair = null;
+
+      // Salto duro: fuera todo, estandarte incluido.
       options.battle.close({ instant: true });
       finishIdle();
     },

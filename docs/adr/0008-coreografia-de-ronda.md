@@ -48,11 +48,11 @@ directamente al `RenderUnit` que cae.
 - **Dados.** Un `DiceLayer` (un `InstancedMesh` de planos con un atlas de pips
   generado en `CanvasTexture`) muestra los dados del atacante y del defensor.
   Durante `diceRoll` las caras ciclan (cosmético, determinista: `floor(t·36)
-  mod 6`); durante `diceLand` se asientan en `event.attackerDice[i]` /
+mod 6`); durante `diceLand` se asientan en `event.attackerDice[i]` /
   `event.defenderDice[i]`. El dado que gana su par recibe un `highlight` que el
   shader interpreta como un brillo extra.
 - **Duelos.** Por cada `DuelPlan` la escena lanza un `timeline.to(actor,
-  { lunge: 1, yoyo: true })` para la embestida y, en `duel.start + duel.duration`,
+{ lunge: 1, yoyo: true })` para la embestida y, en `duel.start + duel.duration`,
   un `timeline.call` que emite partículas (`ParticlePool` con `flash`/`smoke`
   para cañón, `dust` para carga, `spark`/`dust` para descarga) y sacude la
   cámara con `options.scene.rig.shake(2.2, 0.16)`. Inmediatamente después se
@@ -103,7 +103,7 @@ las partículas que sigan vivas terminen su vida.
 - `pnpm test` — 58 tests pasan (18 de coreografía + 26 de `composeSquad` + 14
   del tablero clásico).
 - `pnpm --filter @conqueror/client typecheck` y `pnpm --filter @conqueror/rules
-  typecheck` — limpios.
+typecheck` — limpios.
 - `pnpm format:check` y `pnpm lint` — limpios.
 - `pnpm build && pnpm smoke` — el sandbox de combate abre, tira una ronda
   contra el frente marítimo Alaska↔Kamchatka y el HUD reporta las bajas

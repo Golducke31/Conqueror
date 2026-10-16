@@ -63,6 +63,9 @@ const esAR: Dictionary = {
   'sandbox.saltar': 'Saltar',
   'sandbox.pendientes': 'Rondas pendientes',
   'sandbox.dados': 'Última ronda',
+  'sandbox.conquistado': 'Conquistado',
+  'sandbox.aMover': 'Ejércitos a mover',
+  'sandbox.mover': 'Mover',
   'sandbox.ayuda':
     'El sandbox es solo para desarrollo: los eventos están simulados, el motor de reglas llega en el Hito 3.',
 };
@@ -116,6 +119,9 @@ const en: Dictionary = {
   'sandbox.skip': 'Skip',
   'sandbox.pending': 'Pending rounds',
   'sandbox.dice': 'Last round',
+  'sandbox.conquered': 'Conquered',
+  'sandbox.toMove': 'Armies to move',
+  'sandbox.move': 'Move',
   'sandbox.help':
     'Sandbox is for development only: events are simulated, the rules engine arrives in Milestone 3.',
 };

@@ -98,6 +98,10 @@ export class UnitBatch {
     this.material.setDim(value);
   }
 
+  setOpacity(value: number): void {
+    this.material.setOpacity(value);
+  }
+
   visibleUnits(): number {
     return UNIT_ORDER.reduce((total, type) => total + this.counts[type], 0);
   }

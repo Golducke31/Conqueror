@@ -22,6 +22,7 @@ import {
   Vector3,
   type PerspectiveCamera,
 } from 'three';
+import gsap from 'gsap';
 
 import type { TerritoryId } from '@conqueror/shared';
 import type { MockGameState } from '../../app/fixtures.js';
@@ -71,6 +72,33 @@ export interface GameScene {
   setDim(value: number): void;
   /** Unidades visibles en el tablero, para el overlay de depuracion. */
   visibleUnits(): number;
+  /** Indice del territorio en la malla fusionada (`aTerritory`). */
+  territoryIndex(territory: TerritoryId): number | undefined;
+  /**
+   * Radio, en unidades de mundo, que cubre el territorio desde un punto: la
+   * onda de cambio de dueno lo usa para saber hasta donde tiene que barrer.
+   */
+  coverRadiusFrom(territory: TerritoryId, x: number, z: number): number | undefined;
+  /**
+   * Onda de cambio de dueno sobre el material del tablero. Devuelve la timeline
+   * para encadenarla a la coreografia de la conquista.
+   *
+   * OJO con el orden: los atributos de color por vertice siguen teniendo el
+   * color ANTERIOR mientras la onda corre. Recien cuando la onda termina hay que
+   * llamar a `setGameState` con el dueno nuevo, que reescribe los atributos con
+   * el mismo color que muestra el shader. Si se llama antes, el territorio
+   * "desaparece" de la onda.
+   */
+  playOwnershipWave(options: {
+    readonly territoryIndex: number;
+    readonly originX: number;
+    readonly originZ: number;
+    readonly color: Color;
+    readonly radius: number;
+    readonly duration: number;
+  }): gsap.core.Timeline;
+  /** Fuerza la onda a su estado final, para cuando se salta la animacion. */
+  finishOwnershipWave(): void;
   update(deltaSeconds: number): void;
   dispose(): void;
 }
@@ -245,6 +273,9 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
   let elapsed = 0;
   let idleTimer = 0;
 
+  /** Timeline de la onda en curso, para poder forzarla al saltar. */
+  let waveTimeline: gsap.core.Timeline | null = null;
+
   const rebuildTokens = (): void => {
     if (gameState === null) return;
 
@@ -351,6 +382,71 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
 
     visibleUnits(): number {
       return squads.visibleUnits();
+    },
+
+    territoryIndex(territory: TerritoryId): number | undefined {
+      const index = board.territoryIds.indexOf(territory);
+      return index < 0 ? undefined : index;
+    },
+
+    coverRadiusFrom(territory: TerritoryId, x: number, z: number): number | undefined {
+      const geometry = data.byId.get(territory);
+      if (geometry === undefined) return undefined;
+      // La bbox viene en longitud desenrollada, igual que la que usa la
+      // geometria del tablero: proyectar las cuatro esquinas alcanza.
+      const [minLon, minLat, maxLon, maxLat] = geometry.bbox;
+      const corners: readonly (readonly [number, number])[] = [
+        [minLon, minLat],
+        [maxLon, minLat],
+        [minLon, maxLat],
+        [maxLon, maxLat],
+      ];
+      let radius = 0;
+      for (const [lon, lat] of corners) {
+        const corner = board.projection.toWorld(lon, lat);
+        radius = Math.max(radius, Math.hypot(corner.x - x, corner.z - z));
+      }
+      // Piso para islas chicas: la onda tiene que verse aunque el territorio
+      // sea pequenio. Sobrepasar el radio no tine nada fuera del territorio.
+      return Math.max(radius, 40) + 30;
+    },
+
+    playOwnershipWave(waveOptions): gsap.core.Timeline {
+      waveTimeline?.kill();
+      territoryMaterial.startWave({
+        territory: waveOptions.territoryIndex,
+        originX: waveOptions.originX,
+        originZ: waveOptions.originZ,
+        color: waveOptions.color,
+      });
+
+      const state = { radius: 0 };
+      const timeline = gsap.timeline({
+        onComplete: () => {
+          territoryMaterial.clearWave();
+          waveTimeline = null;
+          options.renderer.setContinuous(false);
+        },
+      });
+      timeline.to(state, {
+        radius: Math.max(1, waveOptions.radius),
+        duration: Math.max(0.05, waveOptions.duration),
+        ease: 'power2.out',
+        onUpdate: () => {
+          territoryMaterial.setWaveRadius(state.radius);
+          options.renderer.requestRender();
+        },
+      });
+      options.renderer.setContinuous(true);
+      waveTimeline = timeline;
+      return timeline;
+    },
+
+    finishOwnershipWave(): void {
+      if (waveTimeline === null) return;
+      waveTimeline.progress(1);
+      territoryMaterial.clearWave();
+      waveTimeline = null;
     },
 
     update(deltaSeconds: number): void {

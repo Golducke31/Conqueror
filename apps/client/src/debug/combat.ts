@@ -5,6 +5,10 @@
  * entre dos territorios vecinos sin jugar una partida, elegir los ejércitos de
  * cada bando, el nivel de espectáculo y el tipo de enlace.
  *
+ * En C3 ademas se ve la secuencia completa de la conquista: ronda final,
+ * onda de cambio de dueño con estandarte, y la marcha posterior de los
+ * ejercitos que el jugador decide mover (la dispara el boton, no el director).
+ *
  * OJO: aca los eventos estan SIMULADOS. El motor de reglas de verdad llega en el
  * Hito 3; cuando exista, el sandbox pasa a pedirle los eventos a `apply()` y
  * este simulador se borra.
@@ -21,7 +25,7 @@ import { playerColor } from '../app/palette.js';
 import { createRenderer } from '../render/renderer.js';
 import { createBattleScene } from '../render/combat/BattleScene.js';
 import { createCombatDirector } from '../render/combat/CombatDirector.js';
-import type { SpectacleLevel } from '../render/combat/spectacle.js';
+import { SPECTACLE_PROFILES, type SpectacleLevel } from '../render/combat/spectacle.js';
 import { createGameScene } from '../scenes/game/GameScene.js';
 
 function nodo(etiqueta: string, clase: string, texto?: string): HTMLElement {
@@ -119,6 +123,10 @@ async function main(): Promise<void> {
   renderer.scene.add(battle.group);
 
   let lastRound: BattleRoundResolved | null = null;
+  /** Conquista en curso: el estandarte esta plantado y falta la marcha. */
+  let conquista: { readonly from: string; readonly to: string } | null = null;
+  /** Marcha de ejercitos en curso (la dispara el boton, no el director). */
+  let marching = false;
 
   const director = createCombatDirector({
     renderer,
@@ -153,12 +161,37 @@ async function main(): Promise<void> {
       lastRound = event;
       actualizarPanel();
     },
+    onConquered: (territory) => {
+      // La onda ya barrio el territorio: recien aca se aplica el dueno nuevo.
+      const pair = lastRound;
+      if (pair === null) return;
+      const fromState = gameState.territories[pair.from];
+      const toState = gameState.territories[territory];
+      if (fromState === undefined || toState === undefined) return;
+      gameState = {
+        ...gameState,
+        territories: {
+          ...gameState.territories,
+          // Una vanguardia ocupa el territorio; el resto de los atacantes
+          // queda en el origen, listo para la marcha.
+          [territory]: { ...toState, owner: fromState.owner, armies: 1 },
+        },
+      };
+      scene.setGameState(gameState);
+      conquista = { from: pair.from, to: territory };
+      scene.focusTerritory(territory, { distance: 260, polarDeg: 52, duration: 0.6 });
+      actualizarPanel();
+    },
   });
 
   renderer.onFrame((delta) => {
     scene.update(delta);
     director.update(delta);
   });
+
+  // Cuando el director queda libre se refresca el panel: la fila de marcha
+  // habilita su boton recien cuando la secuencia de conquista termino.
+  director.onIdle(() => actualizarPanel());
 
   // ---- Interfaz -----------------------------------------------------------
 
@@ -244,6 +277,27 @@ async function main(): Promise<void> {
   acciones.append(botonRonda, botonConquistar, botonSaltar, botonReiniciar);
   panel.append(acciones);
 
+  // ---- Marcha posterior a la conquista ------------------------------------
+  // Aparece cuando el estandarte esta plantado: el jugador elige cuantos
+  // ejercitos mover del territorio de origen al conquistado.
+
+  const filaMover = nodo(
+    'div',
+    'mt-3 hidden items-center gap-2 rounded border border-grana/60 bg-hilo/60 p-2',
+  );
+  const inputMover = document.createElement('input');
+  inputMover.type = 'number';
+  inputMover.min = '1';
+  inputMover.className =
+    'w-16 rounded border border-lana-3 bg-hilo/80 px-2 py-1 text-xs text-algodon';
+  const botonMover = boton(t('sandbox.mover'));
+  filaMover.append(
+    nodo('span', 'text-[11px] uppercase tracking-wider text-algodon/50', t('sandbox.aMover')),
+    inputMover,
+    botonMover,
+  );
+  panel.append(filaMover);
+
   hud.append(panel);
 
   /** Pares adyacentes, para no ofrecer combinaciones invalidas. */
@@ -251,6 +305,11 @@ async function main(): Promise<void> {
 
   function nombreDe(id: string): string {
     return scene.data.byId.get(id)?.names['es-AR'] ?? id;
+  }
+
+  /** El director esta ocupado o hay una marcha en curso: nada se dispara. */
+  function ocupado(): boolean {
+    return director.isBusy() || marching;
   }
 
   function actualizarPanel(): void {
@@ -266,6 +325,20 @@ async function main(): Promise<void> {
     }
     info.textContent = lineas.join('\n');
     info.style.whiteSpace = 'pre-line';
+
+    if (conquista !== null) {
+      const disponibles = (gameState.territories[conquista.from]?.armies ?? 1) - 1;
+      filaMover.classList.remove('hidden');
+      filaMover.classList.add('flex');
+      inputMover.max = String(Math.max(1, disponibles));
+      inputMover.value = String(Math.max(1, Math.min(disponibles, 2)));
+      // Mientras la secuencia de conquista se funde, el director sigue
+      // ocupado: el boton espera.
+      botonMover.disabled = disponibles < 1 || ocupado();
+    } else {
+      filaMover.classList.add('hidden');
+      filaMover.classList.remove('flex');
+    }
   }
 
   function llenarDestinos(): void {
@@ -327,6 +400,7 @@ async function main(): Promise<void> {
   });
 
   botonRonda.addEventListener('click', () => {
+    if (ocupado()) return;
     const from = selectorOrigen.value;
     const to = selectorDestino.value;
     const attackerArmies = Math.max(2, Number(inputAtacante.value) || 2);
@@ -345,6 +419,7 @@ async function main(): Promise<void> {
   });
 
   botonConquistar.addEventListener('click', () => {
+    if (ocupado()) return;
     const from = selectorOrigen.value;
     const to = selectorDestino.value;
     const fromState = gameState.territories[from];
@@ -373,6 +448,59 @@ async function main(): Promise<void> {
     director.enqueue([event, { type: 'TERRITORY_CONQUERED', territory: to }]);
   });
 
+  botonMover.addEventListener('click', () => {
+    if (conquista === null || ocupado()) return;
+    const from = conquista.from;
+    const to = conquista.to;
+    const disponibles = (gameState.territories[from]?.armies ?? 1) - 1;
+    const count = Math.max(1, Math.min(disponibles, Math.floor(Number(inputMover.value) || 1)));
+    if (disponibles < 1) return;
+
+    const fromAnchor = scene.board.projection.toWorld(
+      scene.data.byId.get(from)?.labelAnchor[0] ?? 0,
+      scene.data.byId.get(from)?.labelAnchor[1] ?? 0,
+    );
+    const toAnchor = scene.board.projection.toWorld(
+      scene.data.byId.get(to)?.labelAnchor[0] ?? 0,
+      scene.data.byId.get(to)?.labelAnchor[1] ?? 0,
+    );
+
+    marching = true;
+    actualizarPanel();
+
+    battle.playMarch({
+      fromX: fromAnchor.x,
+      fromZ: fromAnchor.z,
+      toX: toAnchor.x,
+      toZ: toAnchor.z,
+      count,
+      color: playerColor(
+        gameState.players.find((player) => player.id === gameState.territories[to]?.owner)?.color ??
+          'rojo',
+      ),
+      profile: SPECTACLE_PROFILES[selectorNivel.value as SpectacleLevel],
+      onComplete: () => {
+        // La marcha llego: los ejercitos se mueven de verdad.
+        const fromState = gameState.territories[from];
+        const toState = gameState.territories[to];
+        if (fromState !== undefined && toState !== undefined) {
+          gameState = {
+            ...gameState,
+            territories: {
+              ...gameState.territories,
+              [from]: { ...fromState, armies: Math.max(1, fromState.armies - count) },
+              [to]: { ...toState, armies: toState.armies + count },
+            },
+          };
+          scene.setGameState(gameState);
+        }
+        conquista = null;
+        marching = false;
+        actualizarPanel();
+      },
+    });
+  });
+
   botonSaltar.addEventListener('click', () => director.skip());
 
   botonReiniciar.addEventListener('click', () => {
@@ -385,6 +513,8 @@ async function main(): Promise<void> {
     });
     scene.setGameState(gameState);
     lastRound = null;
+    conquista = null;
+    marching = false;
     paresDisponibles();
     scene.focusPoint(0, 0, { distance: 1020, polarDeg: 42, instant: true });
   });

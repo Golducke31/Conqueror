@@ -11,9 +11,21 @@
  * rondas la mantiene la propia escena: recuerda qué unidades siguen vivas y las
  * siguientes rondas las vuelven a desplegar ya mermadas.
  *
+ * C3 agrega:
+ *   - La CONQUISTA (playConquest): la escuadra atacante avanza al territorio
+ *     conquistado, se planta el estandarte y la onda de cambio de dueño barre
+ *     el territorio desde el frente (la onda vive en el material del tablero,
+ *     ver mapMaterials.ts). Al final las escuadras se funden.
+ *   - La MARCHA posterior (playMarch): los ejercitos que el jugador decide
+ *     mover caminan del territorio de origen al conquistado. La dispara la
+ *     aplicacion, no la cola de eventos.
+ *   - El CRUCE MARITIMO (en open()): si el frente es un seaLink, los navios
+ *     navegan de costa a costa, hay una andanada visual (sin bajas: las decide
+ *     el motor en la ronda que sigue) y las tropas desembarcan.
+ *
  * NADA de esto decide resultados: el `BattleRoundResolved` ya viene resuelto por
- * el motor y `planRound` (puro) lo traduce a un plan de tiempos. Ver
- * docs/adr/0006-combate-visual-no-decide.md
+ * el motor y `planRound`/`planConquest`/`planSeaCrossing` (puros) lo traducen a
+ * planes de tiempos. Ver docs/adr/0006-combate-visual-no-decide.md
  */
 
 import gsap from 'gsap';
@@ -22,13 +34,18 @@ import { Color as ThreeColor, Group, Vector3 } from 'three';
 
 import { composeSquad, type BattleRoundResolved, type UnitType } from '@conqueror/rules';
 import type { FrontAnchor } from '@conqueror/map-data';
+import type { TerritoryId } from '@conqueror/shared';
 import type { RendererHandle } from '../renderer.js';
 import type { GameScene } from '../../scenes/game/GameScene.js';
 import { UNIT_ORDER, UnitBatch, type UnitInstance } from '../tokens/UnitBatch.js';
 import { SPECTACLE_PROFILES, type SpectacleProfile } from './spectacle.js';
+import { planConquest, type ConquestPlan } from './choreography/conquest.js';
+import { planSeaCrossing, type SeaCrossingPlan } from './choreography/sea.js';
 import { planRound, type RoundPlan } from './choreography/round.js';
 import { DiceLayer, type DiePlacement } from './dice/DiceLayer.js';
 import { ParticlePool, type ParticleBurst } from './fx/ParticlePool.js';
+import { createBannerLayer } from './BannerLayer.js';
+import { ShipLayer } from './units/ShipLayer.js';
 
 /** Separacion entre la linea de frente y cada escuadra. */
 const LINE_GAP = 30;
@@ -44,6 +61,32 @@ const DICE_SCALE = 13;
 
 /** Altura a la que flotan los dados sobre el suelo. */
 const DICE_LIFT = 0.9;
+
+/** Distancia de la linea de navios a la costa defensora. */
+const SHIP_STANDOFF = 26;
+
+/** Escala de los navios respecto de la geometria. */
+const SHIP_SCALE = 1.8;
+
+/** Separacion entre navios en la linea. */
+const SHIP_SPACING = 22;
+
+/**
+ * Tope de unidades marchando tras la conquista. Mas de cinco no se leen a
+ * distancia de tablero (las fichas del mapa usan el mismo tope): el resto de
+ * los ejercitos van en el estado, no en la animacion.
+ */
+const MARCH_MAX_UNITS = 5;
+
+/** Escala de las unidades en marcha: por encima de las fichas del tablero
+ *  (1.5) para que la marcha se lea como un evento y no como una ficha mas. */
+const MARCH_SCALE = 2.8;
+
+/** Separacion entre unidades en la formacion de marcha. */
+const MARCH_SPACING = 9;
+
+/** Cuanto de la marcha (0..1) tiene que pasar para soltar otra nube de polvo. */
+const MARCH_PUFF_STEP = 0.18;
 
 /** Indice de la unidad viva de un bando, en orden de formacion. */
 interface RenderUnit {
@@ -87,6 +130,41 @@ export interface OpenBattleOptions {
   readonly instant: boolean;
 }
 
+/** Territorio conquistado, para la secuencia de conquista. */
+export interface ConquestTarget {
+  readonly territory: TerritoryId;
+  /** Indice del territorio en la malla del tablero (`aTerritory`). */
+  readonly territoryIndex: number;
+  /** Color del dueno NUEVO (el atacante). */
+  readonly color: Color;
+  /** Ancla del territorio, donde se planta el estandarte. */
+  readonly anchorX: number;
+  readonly anchorZ: number;
+  /** Radio que la onda de cambio de dueño tiene que cubrir. */
+  readonly coverRadius: number;
+}
+
+export interface ConquestOptions {
+  readonly target: ConquestTarget;
+  /** Origen del barrido de la onda: el punto del frente. */
+  readonly waveOriginX: number;
+  readonly waveOriginZ: number;
+  readonly profile: SpectacleProfile;
+}
+
+export interface MarchOptions {
+  readonly fromX: number;
+  readonly fromZ: number;
+  readonly toX: number;
+  readonly toZ: number;
+  /** Ejercitos que marchan (se limitan a `MARCH_MAX_UNITS` visuales). */
+  readonly count: number;
+  readonly color: Color;
+  readonly profile: SpectacleProfile;
+  /** Se llama cuando la marcha terminó (o se forzó al saltar). */
+  readonly onComplete: () => void;
+}
+
 export interface BattleSceneOptions {
   readonly renderer: RendererHandle;
   readonly scene: GameScene;
@@ -98,11 +176,16 @@ export interface BattleScene {
   readonly group: Group;
   open(options: OpenBattleOptions): gsap.core.Timeline;
   playRound(event: BattleRoundResolved, profile: SpectacleProfile): gsap.core.Timeline;
-  close(options?: { instant?: boolean }): gsap.core.Timeline;
+  /** Secuencia de conquista: avance, estandarte, onda, fundido. */
+  playConquest(options: ConquestOptions): gsap.core.Timeline;
+  /** Marcha de los ejercitos movidos tras la conquista. */
+  playMarch(options: MarchOptions): gsap.core.Timeline;
+  close(options?: { instant?: boolean; keepBanner?: boolean }): gsap.core.Timeline;
   isOpen(): boolean;
   setTime(seconds: number): void;
   tick(deltaSeconds: number): void;
   visibleUnits(): number;
+  visibleShips(): number;
   attackerRoster(): readonly UnitType[];
   defenderRoster(): readonly UnitType[];
   dispose(): void;
@@ -138,12 +221,23 @@ function formationPositions(
   return positions;
 }
 
+/** Diferencia angular mas corta entre dos rumbos, para no girar de mas. */
+function shortestAngleDelta(from: number, to: number): number {
+  let delta = (to - from) % (Math.PI * 2);
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  return delta;
+}
+
 export function createBattleScene(options: BattleSceneOptions): BattleScene {
   const group = new Group();
   const batch = new UnitBatch({ capacity: 64 });
   const dice = new DiceLayer();
   const particles = new ParticlePool(512);
-  group.add(batch.group, dice.group, particles.group);
+  // El estandarte se apoya en el relieve, igual que las escuadras.
+  const banner = createBannerLayer({ baseY: options.scene.board.relief + 0.5 });
+  const ships = new ShipLayer({ capacity: 8 });
+  group.add(batch.group, dice.group, particles.group, banner.group, ships.group);
   group.visible = false;
 
   let attackerSide: BattleSideInternal | null = null;
@@ -153,13 +247,17 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
   let baseY = 1;
   let deployProgress = 1;
   let open = false;
+  /** Timeline de la marcha en curso, para forzarla al saltar. */
+  let marchTl: gsap.core.Timeline | null = null;
+  /** Estandarte plantado durante la secuencia de conquista. */
+  let bannerPlanted = false;
 
   const attackerDicePos: Vector3[] = [];
   const defenderDicePos: Vector3[] = [];
 
   /** Recoloca las instancias interpolando marcha -> formacion y aplicando caidas. */
   const applyInstances = (): void => {
-    if (attackerSide === null || defenderSide === null) return;
+    if (attackerSide === null && defenderSide === null && marchTl === null) return;
     const instances: UnitInstance[] = [];
 
     const build = (side: BattleSideInternal): void => {
@@ -188,8 +286,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       }
     };
 
-    build(attackerSide);
-    build(defenderSide);
+    if (attackerSide !== null) build(attackerSide);
+    if (defenderSide !== null) build(defenderSide);
     batch.setInstances(instances);
     options.renderer.requestRender();
   };
@@ -204,6 +302,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     center: Vector3,
     dir: Vector3,
     jitterSeed: number,
+    /** Si se pasa, las unidades arrancan alrededor de este punto (desembarco). */
+    startCenter?: Vector3,
   ): BattleSideInternal => {
     const composition = composeSquad(side.armies, { maxUnits: options.maxUnits });
     if (composition.units.length === 0) {
@@ -222,13 +322,17 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
     const units: RenderUnit[] = ordered.map((type, index) => {
       const end = positions[index] ?? center;
-      const spread = 7;
+      // Sin zona de desembarco las unidades salen del ancla del territorio;
+      // con ella, de la playa (con un poco mas de dispersion).
+      const baseX = startCenter?.x ?? side.originX;
+      const baseZ = startCenter?.z ?? side.originZ;
+      const spread = startCenter !== undefined ? 9 : 7;
       const offsetX = (((index * 37 + jitterSeed) % 11) - 5) * (spread / 5);
       const offsetZ = (((index * 53 + jitterSeed) % 13) - 6) * (spread / 6);
       return {
         type,
         color: side.color,
-        start: new Vector3(side.originX + offsetX, baseY, side.originZ + offsetZ),
+        start: new Vector3(baseX + offsetX, baseY, baseZ + offsetZ),
         base: new Vector3(end.x, baseY, end.z),
         rotationY,
         scale: 1.7,
@@ -368,6 +472,134 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     options.renderer.requestRender();
   };
 
+  /** Brasas alrededor del estandarte recien plantado. */
+  const spawnEmbers = (at: Vector3, scale: number): void => {
+    particles.spawn({
+      kind: 'spark',
+      x: at.x,
+      y: at.y + 1,
+      z: at.z,
+      count: Math.round(10 * scale),
+      spread: 7,
+      speed: 4,
+      color: new ThreeColor(0xffb347),
+    });
+    options.renderer.requestRender();
+  };
+
+  /**
+   * Secuencia maritima de apertura: navegacion, andanada y desembarco.
+   * Devuelve la timeline, el plan y la zona donde arrancan las tropas (la
+   * playa), o `null` si el frente es terrestre.
+   */
+  const openSeaCrossing = (
+    front: FrontAnchor,
+    attackerArmies: number,
+    attackerColor: Color,
+    profile: SpectacleProfile,
+  ): {
+    timeline: gsap.core.Timeline;
+    plan: SeaCrossingPlan;
+    landingCenter: Vector3;
+  } | null => {
+    if (front.kind !== 'sea' || front.coastA === null || front.coastB === null) return null;
+
+    const projection = options.scene.board.projection;
+    // `toWorld` devuelve un punto 2D {x, z}, no un Vector3.
+    const coastA = projection.toWorld(front.coastA[0], front.coastA[1]);
+    const coastB = projection.toWorld(front.coastB[0], front.coastB[1]);
+
+    const sailDir = new Vector3(coastB.x - coastA.x, 0, coastB.z - coastA.z);
+    if (sailDir.lengthSq() < 1e-6) return null;
+    sailDir.normalize();
+    const sailRight = new Vector3(sailDir.z, 0, -sailDir.x);
+
+    // Un navio por unidad de artilleria de la escuadra, minimo uno.
+    const composition = composeSquad(attackerArmies, { maxUnits: options.maxUnits });
+    const artilleryUnits = composition.units.find((unit) => unit.type === 'artillery')?.count ?? 0;
+    const shipCount = Math.max(1, artilleryUnits);
+
+    const lateralOf = (index: number): number => (index - (shipCount - 1) / 2) * SHIP_SPACING;
+    const startPositions = Array.from({ length: shipCount }, (_, index) => {
+      const lateral = lateralOf(index);
+      return new Vector3(
+        coastA.x + sailRight.x * lateral,
+        baseY + 0.4,
+        coastA.z + sailRight.z * lateral,
+      );
+    });
+    // La linea de fondeo: frente a la costa del defensor, sin tocar tierra.
+    const anchorCenter = new Vector3(coastB.x, 0, coastB.z).addScaledVector(
+      sailDir,
+      -SHIP_STANDOFF,
+    );
+    const anchorPositions = startPositions.map((_, index) => {
+      const lateral = lateralOf(index);
+      return new Vector3(
+        anchorCenter.x + sailRight.x * lateral,
+        baseY + 0.4,
+        anchorCenter.z + sailRight.z * lateral,
+      );
+    });
+
+    const plan = planSeaCrossing({ timing: profile.sea, shipCount });
+    const timeline = gsap.timeline();
+    const shipState = { t: 0 };
+    const rotationY = Math.atan2(sailDir.x, sailDir.z);
+
+    const placeShips = (t: number): void => {
+      const instances = startPositions.map((start, index) => {
+        const end = anchorPositions[index] ?? start;
+        // Arco suave: se aparta de la recta a la mitad del camino.
+        const arc = Math.sin(Math.PI * t) * 10;
+        return {
+          x: start.x + (end.x - start.x) * t + sailRight.x * arc,
+          y: baseY + 0.4,
+          z: start.z + (end.z - start.z) * t + sailRight.z * arc,
+          rotationY,
+          scale: SHIP_SCALE,
+          color: attackerColor,
+        };
+      });
+      ships.setInstances(instances);
+      options.renderer.requestRender();
+    };
+
+    if (plan.sail.duration <= 0) {
+      // Rapido (o salto): los navios fonden directamente.
+      placeShips(1);
+    } else {
+      timeline.to(
+        shipState,
+        {
+          t: 1,
+          duration: plan.sail.duration,
+          ease: 'power1.inOut',
+          onUpdate: () => placeShips(shipState.t),
+        },
+        plan.sail.start,
+      );
+    }
+
+    if (plan.broadside.duration > 0) {
+      // Andanada: puro espectaculo. Las bajas las decide el motor en la ronda.
+      timeline.call(
+        () => {
+          for (const anchorPosition of anchorPositions) {
+            spawnImpact('cannon', anchorPosition, 0.8);
+          }
+          if (profile.cameraShake) options.scene.rig.shake(2.6, 0.2);
+        },
+        undefined,
+        plan.broadside.start + plan.broadside.duration * 0.5,
+      );
+    }
+
+    // Desembarco: las tropas arrancan en la playa, frente a los navios.
+    const landingCenter = anchorCenter.clone().addScaledVector(sailDir, SHIP_STANDOFF * 0.5);
+    return { timeline, plan, landingCenter };
+  };
+
   return {
     group,
 
@@ -395,7 +627,22 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       const attackerCenter = frontCenter.clone().addScaledVector(forward, -LINE_GAP);
       const defenderCenter = frontCenter.clone().addScaledVector(forward, LINE_GAP);
 
-      attackerSide = buildSide(openOptions.attacker, attackerCenter, forward.clone(), 3);
+      // Si el frente es maritimo, el atacante llega por mar: la secuencia de
+      // apertura incluye navegacion, andanada y desembarco.
+      const sea = openSeaCrossing(
+        front,
+        openOptions.attacker.armies,
+        openOptions.attacker.color,
+        profile,
+      );
+
+      attackerSide = buildSide(
+        openOptions.attacker,
+        attackerCenter,
+        forward.clone(),
+        3,
+        sea?.landingCenter,
+      );
       defenderSide = buildSide(openOptions.defender, defenderCenter, forward.clone().negate(), 7);
 
       // Huecos de los dados: una fila corta delante de cada linea, centrada.
@@ -436,23 +683,37 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       });
 
       const timeline = gsap.timeline();
-      if (!profile.deploy || openOptions.instant) {
+      if (sea !== null) timeline.add(sea.timeline, 0);
+
+      const deployInstant =
+        openOptions.instant || !profile.deploy || (sea !== null && profile.sea.landing <= 0);
+      if (deployInstant) {
         deployProgress = 1;
         applyInstances();
         open = true;
         return timeline;
       }
 
+      // El despliegue (o desembarco, si la llegada fue por mar) arranca cuando
+      // termina la travesia: las tropas bajan de los navios ya en la playa.
+      const deployStart = sea !== null ? sea.plan.landing.start : 0;
       const state = { progress: 0 };
-      timeline.to(state, {
-        progress: 1,
-        duration: Math.max(0.25, profile.roundSeconds * 0.35),
-        ease: 'power2.out',
-        onUpdate: () => {
-          deployProgress = state.progress;
-          applyInstances();
+      timeline.to(
+        state,
+        {
+          progress: 1,
+          duration:
+            sea !== null
+              ? Math.max(0.25, profile.sea.landing)
+              : Math.max(0.25, profile.roundSeconds * 0.35),
+          ease: 'power2.out',
+          onUpdate: () => {
+            deployProgress = state.progress;
+            applyInstances();
+          },
         },
-      });
+        deployStart,
+      );
 
       open = true;
       return timeline;
@@ -573,15 +834,256 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       return timeline;
     },
 
-    close(closeOptions: { instant?: boolean } = {}): gsap.core.Timeline {
+    playConquest(conquestOptions: ConquestOptions): gsap.core.Timeline {
+      const { target, profile } = conquestOptions;
+      const plan: ConquestPlan = planConquest({ timing: profile.conquest });
+      const timeline = gsap.timeline();
+
+      const anchorWorld = new Vector3(target.anchorX, baseY, target.anchorZ);
+
+      // --- Avance: la escuadra atacante marcha al territorio conquistado. ----
+      const units = attackerSide === null ? [] : attackerSide.units.filter((u) => u.alive);
+      const toAnchor = anchorWorld
+        .clone()
+        .sub(units[0]?.base ?? anchorWorld)
+        .setY(0);
+      if (toAnchor.lengthSq() < 1e-6) toAnchor.set(0, 0, 1);
+      toAnchor.normalize();
+      const anchorRight = new Vector3(toAnchor.z, 0, -toAnchor.x);
+      const slots = formationPositions(units.length, anchorWorld, toAnchor, anchorRight, 9);
+
+      units.forEach((unit, index) => {
+        const slot = slots[index] ?? anchorWorld;
+        const targetRotation =
+          unit.rotationY + shortestAngleDelta(unit.rotationY, Math.atan2(toAnchor.x, toAnchor.z));
+        timeline.to(
+          unit.base,
+          {
+            x: slot.x,
+            y: baseY,
+            z: slot.z,
+            duration: plan.advance.duration,
+            ease: 'power2.inOut',
+            onUpdate: () => applyInstances(),
+          },
+          index * 0.02,
+        );
+        timeline.to(
+          unit,
+          {
+            rotationY: targetRotation,
+            duration: plan.advance.duration,
+            ease: 'power2.inOut',
+            onUpdate: () => applyInstances(),
+          },
+          index * 0.02,
+        );
+      });
+
+      // --- Estandarte: se planta con un pequeño rebote de escala. -------------
+      timeline.call(
+        () => {
+          // La bandera mira hacia la camara, que esta del lado del atacante.
+          const rotationY = Math.atan2(-forward.x, -forward.z);
+          banner.plant({ x: target.anchorX, z: target.anchorZ, color: target.color, rotationY });
+          bannerPlanted = true;
+          banner.group.scale.set(0.25, 0.25, 0.25);
+        },
+        undefined,
+        plan.plant.start,
+      );
+      timeline.to(
+        banner.group.scale,
+        {
+          x: 1,
+          y: 1,
+          z: 1,
+          duration: plan.plant.duration,
+          ease: 'back.out(2.2)',
+        },
+        plan.plant.start,
+      );
+
+      // --- Onda de cambio de dueno: barre desde el frente. -------------------
+      const waveTimeline = options.scene.playOwnershipWave({
+        territoryIndex: target.territoryIndex,
+        originX: conquestOptions.waveOriginX,
+        originZ: conquestOptions.waveOriginZ,
+        color: target.color,
+        radius: target.coverRadius,
+        duration: plan.wave.duration,
+      });
+      timeline.add(waveTimeline, plan.wave.start);
+
+      // --- Sostener: brasas alrededor del estandarte. ------------------------
+      if (plan.hold.duration > 0) {
+        timeline.call(
+          () => spawnEmbers(anchorWorld, profile.particleScale),
+          undefined,
+          plan.hold.start,
+        );
+      }
+
+      // --- Fundido: las escuadras del campo se disuelven. --------------------
+      const opacity = { v: 1 };
+      timeline.to(
+        opacity,
+        {
+          v: 0,
+          duration: plan.close.duration,
+          ease: 'power2.in',
+          onUpdate: () => batch.setOpacity(opacity.v),
+        },
+        plan.close.start,
+      );
+      timeline.call(
+        () => {
+          attackerSide = null;
+          defenderSide = null;
+          // Las escuadras ya estan fundidas: se retiran las instancias para
+          // que el cierre de la escena no las vuelva a mostrar.
+          batch.setInstances([]);
+          batch.setOpacity(1);
+          applyInstances();
+        },
+        undefined,
+        plan.close.start + plan.close.duration,
+      );
+
+      return timeline;
+    },
+
+    playMarch(marchOptions: MarchOptions): gsap.core.Timeline {
+      const count = Math.max(1, Math.min(MARCH_MAX_UNITS, Math.floor(marchOptions.count)));
+      const from = new Vector3(marchOptions.fromX, baseY, marchOptions.fromZ);
+      const to = new Vector3(marchOptions.toX, baseY, marchOptions.toZ);
+      const dir = to.clone().sub(from).setY(0);
+      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+      dir.normalize();
+      const marchRight = new Vector3(dir.z, 0, -dir.x);
+      const rotationY = Math.atan2(dir.x, dir.z);
+
+      // Formacion de marcha: columnas hacia el destino.
+      const slots = formationPositions(count, from, dir, marchRight, MARCH_SPACING);
+
+      group.visible = true;
+      options.renderer.setContinuous(true);
+
+      // Si la secuencia de conquista se salto, el estandarte no quedo plantado:
+      // se planta ahora, como parte de la llegada.
+      if (!bannerPlanted) {
+        banner.plant({
+          x: marchOptions.toX,
+          z: marchOptions.toZ,
+          color: marchOptions.color,
+          rotationY: Math.atan2(-dir.x, -dir.z),
+        });
+        bannerPlanted = true;
+        banner.group.scale.set(0.25, 0.25, 0.25);
+      }
+
+      // Polvo en la partida.
+      particles.spawn({
+        kind: 'dust',
+        x: from.x,
+        y: baseY + 0.5,
+        z: from.z,
+        count: Math.round(10 * marchOptions.profile.particleScale),
+        spread: 8,
+        speed: 3,
+        color: new ThreeColor(0xb9a07a),
+      });
+
+      const state = { t: 0 };
+      let lastPuff = -1;
+      const timeline = gsap.timeline({
+        onComplete: () => {
+          batch.setInstances([]);
+          batch.setOpacity(1);
+          banner.remove();
+          bannerPlanted = false;
+          ships.setInstances([]);
+          group.visible = false;
+          open = false;
+          marchTl = null;
+          options.renderer.setContinuous(false);
+          options.renderer.requestRender();
+          marchOptions.onComplete();
+        },
+      });
+      timeline.to(
+        banner.group.scale,
+        { x: 1, y: 1, z: 1, duration: 0.3, ease: 'back.out(2.2)' },
+        0,
+      );
+      timeline.to(state, {
+        t: 1,
+        duration: Math.max(0.4, marchOptions.profile.marchSeconds),
+        ease: 'none',
+        onUpdate: () => {
+          const instances: UnitInstance[] = slots.map((slot) => {
+            const px = from.x + (to.x - from.x) * state.t + (slot.x - from.x);
+            const pz = from.z + (to.z - from.z) * state.t + (slot.z - from.z);
+            return {
+              type: 'infantry' as UnitType,
+              x: px,
+              y: baseY,
+              z: pz,
+              rotationY,
+              scale: MARCH_SCALE,
+              color: marchOptions.color,
+            };
+          });
+          batch.setInstances(instances);
+          // Polvo en la pisada: deja el camino recorrido a la vista.
+          if (state.t - lastPuff >= MARCH_PUFF_STEP) {
+            lastPuff = state.t;
+            particles.spawn({
+              kind: 'dust',
+              x: from.x + (to.x - from.x) * state.t,
+              y: baseY + 0.3,
+              z: from.z + (to.z - from.z) * state.t,
+              count: 3,
+              spread: 5,
+              speed: 1.5,
+              color: new ThreeColor(0xb9a07a),
+            });
+          }
+          options.renderer.requestRender();
+        },
+      });
+      marchTl = timeline;
+      return timeline;
+    },
+
+    close(closeOptions: { instant?: boolean; keepBanner?: boolean } = {}): gsap.core.Timeline {
       options.renderer.setContinuous(true);
       options.scene.setDim(1);
       dice.setOpacity(0);
       particles.clear();
 
+      // Salto duro: la marcha en curso se fuerza a su final (su onComplete
+      // aplica el estado de las reglas) y el estandarte se retira.
+      if (marchTl !== null) {
+        marchTl.progress(1);
+        marchTl = null;
+      }
+
+      // Tras una conquista el estandarte se queda plantado: marca el
+      // territorio recien conquistado hasta que se haga la marcha. Las demas
+      // capas ya quedaron invisibles (escuadras fundidas, dados en opacidad
+      // cero, navios retirados), asi que el grupo puede seguir vivo.
+      const keepBanner = closeOptions.keepBanner === true && bannerPlanted;
+      if (!keepBanner) {
+        banner.remove();
+        bannerPlanted = false;
+      }
+      ships.setInstances([]);
+      batch.setOpacity(1);
+
       const timeline = gsap.timeline({
         onComplete: () => {
-          group.visible = false;
+          if (!keepBanner) group.visible = false;
           open = false;
           attackerSide = null;
           defenderSide = null;
@@ -592,7 +1094,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
       if (closeOptions.instant === true) {
         timeline.progress(1);
-        group.visible = false;
+        if (!keepBanner) group.visible = false;
         open = false;
         attackerSide = null;
         defenderSide = null;
@@ -614,6 +1116,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
     setTime(seconds: number): void {
       batch.setTime(seconds);
+      ships.setTime(seconds);
+      banner.setTime(seconds);
     },
 
     tick(deltaSeconds: number): void {
@@ -623,6 +1127,10 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
     visibleUnits(): number {
       return batch.visibleUnits();
+    },
+
+    visibleShips(): number {
+      return ships.visibleShips();
     },
 
     attackerRoster(): readonly UnitType[] {
@@ -637,6 +1145,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       dice.dispose();
       particles.dispose();
       batch.dispose();
+      ships.dispose();
+      banner.dispose();
     },
   };
 }
