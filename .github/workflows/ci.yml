@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calidad:
+    name: lint + typecheck + test + build + mapa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Formato
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tipos
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Datos crudos del mapa
+        run: pnpm map:fetch
+
+      - name: Construir mapa
+        run: pnpm map:build
+
+      - name: Validar mapa
+        run: pnpm map:validate
+
+      - name: Build del cliente
+        run: pnpm build

@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+/*
+ * Paleta del proyecto. Fija: no se inventan colores nuevos sin pedirlo.
+ * Los nombres son propios del juego (textil andino), no de ningun otro juego.
+ */
+@theme {
+  --color-lana: #151c35;
+  --color-lana-2: #1d2646;
+  --color-lana-3: #28335c;
+  --color-hilo: #0b1022;
+  --color-grana: #a3243b;
+  --color-qolli: #e2a72e;
+  --color-algodon: #efe4cc;
+
+  /* Colores de jugador, en orden de turno. */
+  --color-jugador-rojo: #c0392b;
+  --color-jugador-azul: #2f6fb5;
+  --color-jugador-amarillo: #e2a72e;
+  --color-jugador-verde: #2f6b4f;
+  --color-jugador-negro: #16181d;
+  --color-jugador-magenta: #a03a8c;
+
+  --font-display: 'Georgia', 'Times New Roman', serif;
+}
+
+/* Colores de oceano y tierra, usados tambien por el render WebGL. */
+:root {
+  --oceano: #0b1022;
+  --oceano-borde: #1d2646;
+  --tierra-sin-dueno: #28335c;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overscroll-behavior: none;
+}
+
+body {
+  background-color: var(--oceano);
+}
+
+#lienzo {
+  touch-action: none;
+}
+
+/* Accesibilidad: respetar la preferencia de movimiento reducido. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Foco visible para navegacion por teclado en el HUD. */
+:focus-visible {
+  outline: 2px solid var(--color-qolli);
+  outline-offset: 2px;
+}

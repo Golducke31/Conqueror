@@ -1,0 +1,17 @@
+{
+  "name": "@conqueror/rules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Motor de reglas puro y determinista, compartido por cliente y servidor",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@conqueror/map-data": "workspace:*",
+    "@conqueror/shared": "workspace:*"
+  }
+}

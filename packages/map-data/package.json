@@ -1,0 +1,18 @@
+{
+  "name": "@conqueror/map-data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Configuracion del tablero, matriz clasica y artefactos generados del mapa",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@conqueror/shared": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "@conqueror/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cliente web: render 3D, HUD y transporte de comandos",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@conqueror/map-data": "workspace:*",
+    "@conqueror/rules": "workspace:*",
+    "@conqueror/shared": "workspace:*",
+    "d3-geo": "^3.1.1",
+    "earcut": "^3.2.4",
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.27",
+    "nanostores": "^1.5.5",
+    "three": "^0.186.1",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/d3-geo": "^3.1.1",
+    "@types/earcut": "^3.2.4",
+    "@types/three": "^0.186.0",
+    "@types/topojson-client": "^3.1.5",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
+  }
+}

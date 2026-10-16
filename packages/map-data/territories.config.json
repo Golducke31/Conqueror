@@ -1,0 +1,634 @@
+{
+  "version": 1,
+  "dataset": {
+    "dir": "data/ne",
+    "admin0": "ne_50m_admin_0_countries.geojson",
+    "admin1": "ne_50m_admin_1_states_provinces.geojson",
+    "scale": "50m"
+  },
+  "build": {
+    "simplificationTolerance": 0.05,
+    "quantization": 100000,
+    "minIslandAreaKm2": 1500,
+    "absorbUnassigned": true
+  },
+  "continents": [
+    { "id": "america_del_sur", "names": { "es-AR": "América del Sur", "en": "South America" } },
+    { "id": "america_del_norte", "names": { "es-AR": "América del Norte", "en": "North America" } },
+    { "id": "europa", "names": { "es-AR": "Europa", "en": "Europe" } },
+    { "id": "asia", "names": { "es-AR": "Asia", "en": "Asia" } },
+    { "id": "africa", "names": { "es-AR": "África", "en": "Africa" } },
+    { "id": "oceania", "names": { "es-AR": "Oceanía", "en": "Oceania" } }
+  ],
+  "territories": [
+    {
+      "id": "argentina",
+      "names": { "es-AR": "Argentina", "en": "Argentina" },
+      "continent": "america_del_sur",
+      "source": { "countries": ["ARG"] }
+    },
+    {
+      "id": "brasil",
+      "names": { "es-AR": "Brasil", "en": "Brazil" },
+      "continent": "america_del_sur",
+      "source": { "countries": ["BRA"] },
+      "seaLinks": ["sahara"],
+      "ignoreLandBorders": ["francia"]
+    },
+    {
+      "id": "chile",
+      "names": { "es-AR": "Chile", "en": "Chile" },
+      "continent": "america_del_sur",
+      "source": { "countries": ["CHL"] }
+    },
+    {
+      "id": "colombia",
+      "names": { "es-AR": "Colombia", "en": "Colombia" },
+      "continent": "america_del_sur",
+      "source": { "countries": ["COL", "PAN"] }
+    },
+    {
+      "id": "peru",
+      "names": { "es-AR": "Perú", "en": "Peru" },
+      "continent": "america_del_sur",
+      "source": { "countries": ["PER"] }
+    },
+    {
+      "id": "uruguay",
+      "names": { "es-AR": "Uruguay", "en": "Uruguay" },
+      "continent": "america_del_sur",
+      "source": { "countries": ["URY"] }
+    },
+
+    {
+      "id": "alaska",
+      "names": { "es-AR": "Alaska", "en": "Alaska" },
+      "continent": "america_del_norte",
+      "source": { "subdivisions": { "USA": ["Alaska"] } },
+      "seaLinks": ["kamchatka", "oregon"]
+    },
+    {
+      "id": "yukon",
+      "names": { "es-AR": "Yukón", "en": "Yukon" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": {
+          "CAN": ["Yukon", "Northwest Territories", "British Columbia"]
+        }
+      }
+    },
+    {
+      "id": "canada",
+      "names": { "es-AR": "Canadá", "en": "Canada" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": {
+          "CAN": ["Alberta", "Saskatchewan", "Manitoba", "Nunavut", "Ontario"]
+        }
+      },
+      "seaLinks": ["terranova"],
+      "ignoreLandBorders": ["labrador"]
+    },
+    {
+      "id": "labrador",
+      "names": { "es-AR": "Labrador", "en": "Labrador" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": { "CAN": ["Québec", "Newfoundland and Labrador"] }
+      },
+      "ignoreLandBorders": ["nueva_york"]
+    },
+    {
+      "id": "terranova",
+      "names": { "es-AR": "Terranova", "en": "Newfoundland" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": {
+          "CAN": ["New Brunswick", "Nova Scotia", "Prince Edward Island"]
+        }
+      }
+    },
+    {
+      "id": "oregon",
+      "names": { "es-AR": "Oregón", "en": "Oregon" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": {
+          "USA": ["Washington", "Oregon", "Idaho", "Montana", "Wyoming"]
+        }
+      }
+    },
+    {
+      "id": "california",
+      "names": { "es-AR": "California", "en": "California" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": {
+          "USA": ["California", "Nevada", "Utah", "Arizona", "Colorado", "New Mexico"]
+        }
+      }
+    },
+    {
+      "id": "nueva_york",
+      "names": { "es-AR": "Nueva York", "en": "New York" },
+      "continent": "america_del_norte",
+      "source": {
+        "subdivisions": {
+          "USA": [
+            "Alabama",
+            "Arkansas",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Nebraska",
+            "New Hampshire",
+            "New Jersey",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Vermont",
+            "Virginia",
+            "West Virginia",
+            "Wisconsin"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mexico",
+      "names": { "es-AR": "México", "en": "Mexico" },
+      "continent": "america_del_norte",
+      "source": { "countries": ["MEX"] },
+      "ignoreLandBorders": ["nueva_york"]
+    },
+    {
+      "id": "groenlandia",
+      "names": { "es-AR": "Groenlandia", "en": "Greenland" },
+      "continent": "america_del_norte",
+      "source": { "countries": ["GRL"] },
+      "seaLinks": ["islandia", "labrador", "nueva_york"]
+    },
+
+    {
+      "id": "alemania",
+      "names": { "es-AR": "Alemania", "en": "Germany" },
+      "continent": "europa",
+      "source": { "countries": ["DEU"] },
+      "seaLinks": ["gran_bretana"],
+      "ignoreLandBorders": ["rusia"]
+    },
+    {
+      "id": "espana",
+      "names": { "es-AR": "España", "en": "Spain" },
+      "continent": "europa",
+      "source": { "countries": ["ESP"] },
+      "seaLinks": ["gran_bretana", "sahara"]
+    },
+    {
+      "id": "francia",
+      "names": { "es-AR": "Francia", "en": "France" },
+      "continent": "europa",
+      "source": { "countries": ["FRA"] }
+    },
+    {
+      "id": "gran_bretana",
+      "names": { "es-AR": "Gran Bretaña", "en": "Great Britain" },
+      "continent": "europa",
+      "source": { "countries": ["GBR"] },
+      "seaLinks": ["islandia"]
+    },
+    {
+      "id": "islandia",
+      "names": { "es-AR": "Islandia", "en": "Iceland" },
+      "continent": "europa",
+      "source": { "countries": ["ISL"] },
+      "seaLinks": ["suecia"]
+    },
+    {
+      "id": "italia",
+      "names": { "es-AR": "Italia", "en": "Italy" },
+      "continent": "europa",
+      "source": { "countries": ["ITA"] },
+      "ignoreLandBorders": ["rusia", "turquia"]
+    },
+    {
+      "id": "polonia",
+      "names": { "es-AR": "Polonia", "en": "Poland" },
+      "continent": "europa",
+      "source": { "countries": ["POL"] },
+      "seaLinks": ["turquia"]
+    },
+    {
+      "id": "rusia",
+      "names": { "es-AR": "Rusia", "en": "Russia" },
+      "continent": "europa",
+      "source": {
+        "subdivisions": {
+          "RUS": [
+            "Adygey",
+            "Arkhangel'sk",
+            "Astrakhan'",
+            "Bashkortostan",
+            "Belgorod",
+            "Bryansk",
+            "Chechnya",
+            "Chuvash",
+            "City of St. Petersburg",
+            "Crimea",
+            "Dagestan",
+            "Ingush",
+            "Ivanovo",
+            "Kabardin-Balkar",
+            "Kaliningrad",
+            "Kalmyk",
+            "Kaluga",
+            "Karachay-Cherkess",
+            "Karelia",
+            "Kirov",
+            "Komi",
+            "Kostroma",
+            "Krasnodar",
+            "Kursk",
+            "Leningrad",
+            "Lipetsk",
+            "Mariy-El",
+            "Mordovia",
+            "Moskovskaya",
+            "Moskva",
+            "Murmansk",
+            "Nenets",
+            "Nizhegorod",
+            "North Ossetia",
+            "Novgorod",
+            "Orel",
+            "Orenburg",
+            "Penza",
+            "Perm'",
+            "Pskov",
+            "Rostov",
+            "Ryazan'",
+            "Samara",
+            "Saratov",
+            "Sevastopol",
+            "Smolensk",
+            "Stavropol'",
+            "Tambov",
+            "Tatarstan",
+            "Tula",
+            "Tver'",
+            "Udmurt",
+            "Ul'yanovsk",
+            "Vladimir",
+            "Volgograd",
+            "Vologda",
+            "Voronezh",
+            "Yaroslavl'"
+          ]
+        }
+      },
+      "ignoreLandBorders": ["tartaria"]
+    },
+    {
+      "id": "suecia",
+      "names": { "es-AR": "Suecia", "en": "Sweden" },
+      "continent": "europa",
+      "source": { "countries": ["SWE"] }
+    },
+
+    {
+      "id": "arabia",
+      "names": { "es-AR": "Arabia", "en": "Arabia" },
+      "continent": "asia",
+      "source": {
+        "countries": ["SAU", "YEM", "OMN", "ARE", "QAT", "KWT", "BHR"]
+      },
+      "ignoreLandBorders": ["iran"]
+    },
+    {
+      "id": "aral",
+      "names": { "es-AR": "Aral", "en": "Aral" },
+      "continent": "asia",
+      "source": { "countries": ["KAZ", "UZB", "TKM", "TJK", "KGZ"] },
+      "seaLinks": ["mongolia"],
+      "ignoreLandBorders": ["china"]
+    },
+    {
+      "id": "china",
+      "names": { "es-AR": "China", "en": "China" },
+      "continent": "asia",
+      "source": {
+        "subdivisions": {
+          "CHN": [
+            "Anhui",
+            "Beijing",
+            "Chongqing",
+            "Fujian",
+            "Guangdong",
+            "Guangxi",
+            "Guizhou",
+            "Hainan",
+            "Hebei",
+            "Heilongjiang",
+            "Henan",
+            "Hubei",
+            "Hunan",
+            "Jiangsu",
+            "Jiangxi",
+            "Jilin",
+            "Liaoning",
+            "Shaanxi",
+            "Shandong",
+            "Shanghai",
+            "Shanxi",
+            "Sichuan",
+            "Tianjin",
+            "Xinjiang",
+            "Xizang",
+            "Yunnan",
+            "Zhejiang"
+          ]
+        }
+      },
+      "seaLinks": ["japon"]
+    },
+    {
+      "id": "gobi",
+      "names": { "es-AR": "Gobi", "en": "Gobi" },
+      "continent": "asia",
+      "source": {
+        "subdivisions": {
+          "CHN": ["Gansu", "Inner Mongol", "Ningxia", "Qinghai"]
+        }
+      },
+      "seaLinks": ["iran"],
+      "ignoreLandBorders": ["siberia"]
+    },
+    {
+      "id": "india",
+      "names": { "es-AR": "India", "en": "India" },
+      "continent": "asia",
+      "source": { "countries": ["IND"] },
+      "seaLinks": ["sumatra"]
+    },
+    {
+      "id": "iran",
+      "names": { "es-AR": "Irán", "en": "Iran" },
+      "continent": "asia",
+      "source": { "countries": ["IRN", "AFG", "PAK"] },
+      "seaLinks": ["mongolia"]
+    },
+    {
+      "id": "israel",
+      "names": { "es-AR": "Israel", "en": "Israel" },
+      "continent": "asia",
+      "source": { "countries": ["ISR"] }
+    },
+    {
+      "id": "japon",
+      "names": { "es-AR": "Japón", "en": "Japan" },
+      "continent": "asia",
+      "source": { "countries": ["JPN"] },
+      "seaLinks": ["kamchatka"]
+    },
+    {
+      "id": "kamchatka",
+      "names": { "es-AR": "Kamchatka", "en": "Kamchatka" },
+      "continent": "asia",
+      "source": {
+        "subdivisions": {
+          "RUS": [
+            "Amur",
+            "Chukchi Autonomous Okrug",
+            "Kamchatka",
+            "Khabarovsk",
+            "Maga Buryatdan",
+            "Primor'ye",
+            "Sakha (Yakutia)",
+            "Sakhalin",
+            "Yevrey"
+          ]
+        }
+      },
+      "ignoreLandBorders": ["taimir"]
+    },
+    {
+      "id": "malasia",
+      "names": { "es-AR": "Malasia", "en": "Malaya" },
+      "continent": "asia",
+      "source": {
+        "countries": ["MYS", "PHL", "VNM", "THA", "KHM", "LAO", "MMR", "SGP", "BRN"]
+      }
+    },
+    {
+      "id": "mongolia",
+      "names": { "es-AR": "Mongolia", "en": "Mongolia" },
+      "continent": "asia",
+      "source": { "countries": ["MNG"] }
+    },
+    {
+      "id": "siberia",
+      "names": { "es-AR": "Siberia", "en": "Siberia" },
+      "continent": "asia",
+      "source": {
+        "subdivisions": {
+          "RUS": ["Altay", "Buryat", "Chita", "Gorno-Altay", "Irkutsk", "Khakass", "Tuva"]
+        }
+      }
+    },
+    {
+      "id": "taimir",
+      "names": { "es-AR": "Taimir", "en": "Taymyr" },
+      "continent": "asia",
+      "source": { "subdivisions": { "RUS": ["Krasnoyarsk"] } }
+    },
+    {
+      "id": "tartaria",
+      "names": { "es-AR": "Tartaria", "en": "Tartary" },
+      "continent": "asia",
+      "source": {
+        "subdivisions": {
+          "RUS": [
+            "Chelyabinsk",
+            "Khanty-Mansiy",
+            "Kemerovo",
+            "Kurgan",
+            "Novosibirsk",
+            "Omsk",
+            "Sverdlovsk",
+            "Tomsk",
+            "Tyumen'",
+            "Yamal-Nenets"
+          ]
+        }
+      }
+    },
+    {
+      "id": "turquia",
+      "names": { "es-AR": "Turquía", "en": "Turkey" },
+      "continent": "asia",
+      "source": { "countries": ["TUR"] }
+    },
+
+    {
+      "id": "egipto",
+      "names": { "es-AR": "Egipto", "en": "Egypt" },
+      "continent": "africa",
+      "source": { "countries": ["EGY"] },
+      "seaLinks": ["madagascar", "polonia", "turquia"]
+    },
+    {
+      "id": "etiopia",
+      "names": { "es-AR": "Etiopía", "en": "Ethiopia" },
+      "continent": "africa",
+      "source": { "countries": ["ETH", "SDN", "SSD", "SOM", "DJI", "ERI", "KEN", "UGA"] }
+    },
+    {
+      "id": "madagascar",
+      "names": { "es-AR": "Madagascar", "en": "Madagascar" },
+      "continent": "africa",
+      "source": { "countries": ["MDG"] },
+      "seaLinks": ["zaire"]
+    },
+    {
+      "id": "sahara",
+      "names": { "es-AR": "Sahara", "en": "Sahara" },
+      "continent": "africa",
+      "source": {
+        "countries": [
+          "MAR",
+          "DZA",
+          "TUN",
+          "LBY",
+          "MRT",
+          "MLI",
+          "NER",
+          "TCD",
+          "CAF",
+          "BFA",
+          "SEN",
+          "GMB",
+          "GIN",
+          "GNB",
+          "SLE",
+          "LBR",
+          "CIV",
+          "GHA",
+          "TGO",
+          "BEN",
+          "NGA",
+          "CMR"
+        ]
+      }
+    },
+    {
+      "id": "sudafrica",
+      "names": { "es-AR": "Sudáfrica", "en": "South Africa" },
+      "continent": "africa",
+      "source": { "countries": ["ZAF", "NAM", "BWA", "ZWE", "MOZ", "MWI", "ZMB", "AGO", "TZA"] }
+    },
+    {
+      "id": "zaire",
+      "names": { "es-AR": "Zaire", "en": "Zaire" },
+      "continent": "africa",
+      "source": { "countries": ["COD", "COG", "GAB", "GNQ"] }
+    },
+
+    {
+      "id": "australia",
+      "names": { "es-AR": "Australia", "en": "Australia" },
+      "continent": "oceania",
+      "source": { "countries": ["AUS"] },
+      "seaLinks": ["borneo", "chile", "java", "sumatra"]
+    },
+    {
+      "id": "borneo",
+      "names": { "es-AR": "Borneo", "en": "Borneo" },
+      "continent": "oceania",
+      "source": {
+        "subdivisions": {
+          "IDN": [
+            "Gorontalo",
+            "Kalimantan Barat",
+            "Kalimantan Selatan",
+            "Kalimantan Tengah",
+            "Kalimantan Timur",
+            "Maluku",
+            "Maluku Utara",
+            "Papua",
+            "Papua Barat",
+            "Sulawesi Barat",
+            "Sulawesi Selatan",
+            "Sulawesi Tengah",
+            "Sulawesi Tenggara",
+            "Sulawesi Utara"
+          ]
+        }
+      }
+    },
+    {
+      "id": "java",
+      "names": { "es-AR": "Java", "en": "Java" },
+      "continent": "oceania",
+      "source": {
+        "subdivisions": {
+          "IDN": [
+            "Bali",
+            "Banten",
+            "Jakarta Raya",
+            "Jawa Barat",
+            "Jawa Tengah",
+            "Jawa Timur",
+            "Nusa Tenggara Barat",
+            "Nusa Tenggara Timur",
+            "Yogyakarta"
+          ]
+        }
+      }
+    },
+    {
+      "id": "sumatra",
+      "names": { "es-AR": "Sumatra", "en": "Sumatra" },
+      "continent": "oceania",
+      "source": {
+        "subdivisions": {
+          "IDN": [
+            "Aceh",
+            "Bangka-Belitung",
+            "Bengkulu",
+            "Jambi",
+            "Kepulauan Riau",
+            "Lampung",
+            "Riau",
+            "Sumatera Barat",
+            "Sumatera Selatan",
+            "Sumatera Utara"
+          ]
+        }
+      }
+    }
+  ]
+}

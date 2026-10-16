@@ -1,0 +1,1309 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-16T09:05:39.035Z",
+  "generator": "scripts/build-map.ts",
+  "dataset": "Natural Earth 50m admin_0 + admin_1 (dominio publico)",
+  "projectionNote": "Coordenadas geograficas [lon, lat] en EPSG:4326. La proyeccion a pantalla la resuelve el cliente con d3-geo (geoNaturalEarth1).",
+  "territories": [
+    {
+      "id": "argentina",
+      "names": {
+        "es-AR": "Argentina",
+        "en": "Argentina"
+      },
+      "continent": "america_del_sur",
+      "polygonCount": 4,
+      "centroid": [
+        -64.1041,
+        -29.073
+      ],
+      "labelAnchor": [
+        -64.1017,
+        -28.8958
+      ],
+      "bbox": [
+        -73.5757,
+        -55.0321,
+        -53.6711,
+        -9.7128
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 4283868,
+      "degree": 4
+    },
+    {
+      "id": "brasil",
+      "names": {
+        "es-AR": "Brasil",
+        "en": "Brazil"
+      },
+      "continent": "america_del_sur",
+      "polygonCount": 7,
+      "centroid": [
+        -54.758,
+        -8.1961
+      ],
+      "labelAnchor": [
+        -54.6443,
+        -8.4652
+      ],
+      "bbox": [
+        -74.4793,
+        -33.742,
+        -34.8069,
+        19.9283
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 9851835,
+      "degree": 5
+    },
+    {
+      "id": "chile",
+      "names": {
+        "es-AR": "Chile",
+        "en": "Chile"
+      },
+      "continent": "america_del_sur",
+      "polygonCount": 12,
+      "centroid": [
+        -71.0114,
+        -35.8572
+      ],
+      "labelAnchor": [
+        -70.9485,
+        -34.3539
+      ],
+      "bbox": [
+        -75.707,
+        -55.6435,
+        -67.0093,
+        -17.5053
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 726451,
+      "degree": 3
+    },
+    {
+      "id": "colombia",
+      "names": {
+        "es-AR": "Colombia",
+        "en": "Colombia"
+      },
+      "continent": "america_del_sur",
+      "polygonCount": 2,
+      "centroid": [
+        -75.5034,
+        4.1951
+      ],
+      "labelAnchor": [
+        -75.46,
+        4.2079
+      ],
+      "bbox": [
+        -91.5975,
+        -4.9908,
+        -66.8761,
+        15.0085
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1645728,
+      "degree": 3
+    },
+    {
+      "id": "peru",
+      "names": {
+        "es-AR": "Perú",
+        "en": "Peru"
+      },
+      "continent": "america_del_sur",
+      "polygonCount": 1,
+      "centroid": [
+        -74.4208,
+        -9.1065
+      ],
+      "labelAnchor": [
+        -74.4208,
+        -9.1065
+      ],
+      "bbox": [
+        -81.3374,
+        -18.345,
+        -68.6869,
+        -0.0418
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1296256,
+      "degree": 4
+    },
+    {
+      "id": "uruguay",
+      "names": {
+        "es-AR": "Uruguay",
+        "en": "Uruguay"
+      },
+      "continent": "america_del_sur",
+      "polygonCount": 2,
+      "centroid": [
+        -55.7628,
+        -33.2284
+      ],
+      "labelAnchor": [
+        -56.0253,
+        -32.7899
+      ],
+      "bbox": [
+        -58.4376,
+        -54.8678,
+        -35.797,
+        -30.1075
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 181304,
+      "degree": 2
+    },
+    {
+      "id": "alaska",
+      "names": {
+        "es-AR": "Alaska",
+        "en": "Alaska"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 15,
+      "centroid": [
+        -152.3689,
+        64.0863
+      ],
+      "labelAnchor": [
+        -152.6168,
+        64.3181
+      ],
+      "bbox": [
+        -171.8207,
+        52.8334,
+        -130.0243,
+        71.4081
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1473564,
+      "degree": 3
+    },
+    {
+      "id": "yukon",
+      "names": {
+        "es-AR": "Yukón",
+        "en": "Yukon"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 11,
+      "centroid": [
+        -123.7541,
+        61.688
+      ],
+      "labelAnchor": [
+        -124.0155,
+        60.9291
+      ],
+      "bbox": [
+        -141.0008,
+        48.3217,
+        -101.9872,
+        78.7578
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2722635,
+      "degree": 3
+    },
+    {
+      "id": "canada",
+      "names": {
+        "es-AR": "Canadá",
+        "en": "Canada"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 25,
+      "centroid": [
+        -96.0818,
+        60.0414
+      ],
+      "labelAnchor": [
+        -98.2902,
+        56.3348
+      ],
+      "bbox": [
+        -120.6822,
+        41.6752,
+        -61.206,
+        83.1164
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 5067400,
+      "degree": 4
+    },
+    {
+      "id": "labrador",
+      "names": {
+        "es-AR": "Labrador",
+        "en": "Labrador"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 4,
+      "centroid": [
+        -69.346,
+        53.0677
+      ],
+      "labelAnchor": [
+        -70.3132,
+        53.6058
+      ],
+      "bbox": [
+        -79.667,
+        45.0047,
+        -52.6523,
+        62.5726
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1894124,
+      "degree": 2
+    },
+    {
+      "id": "terranova",
+      "names": {
+        "es-AR": "Terranova",
+        "en": "Newfoundland"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 3,
+      "centroid": [
+        -64.9966,
+        46.0257
+      ],
+      "labelAnchor": [
+        -65.4539,
+        45.9864
+      ],
+      "bbox": [
+        -69.0541,
+        43.5175,
+        -59.8272,
+        48.0668
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 131627,
+      "degree": 3
+    },
+    {
+      "id": "oregon",
+      "names": {
+        "es-AR": "Oregón",
+        "en": "Oregon"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 1,
+      "centroid": [
+        -113.6118,
+        45.4129
+      ],
+      "labelAnchor": [
+        -113.6118,
+        45.4129
+      ],
+      "bbox": [
+        -124.7106,
+        41.0012,
+        -104.0032,
+        48.9928
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1264594,
+      "degree": 5
+    },
+    {
+      "id": "california",
+      "names": {
+        "es-AR": "California",
+        "en": "California"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 1,
+      "centroid": [
+        -112.3355,
+        37.2639
+      ],
+      "labelAnchor": [
+        -112.3355,
+        37.2639
+      ],
+      "bbox": [
+        -124.3722,
+        31.3246,
+        -102.0124,
+        42.001
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1812233,
+      "degree": 3
+    },
+    {
+      "id": "nueva_york",
+      "names": {
+        "es-AR": "Nueva York",
+        "en": "New York"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 6,
+      "centroid": [
+        -90.4317,
+        38.6048
+      ],
+      "labelAnchor": [
+        -90.2425,
+        38.6031
+      ],
+      "bbox": [
+        -172.7783,
+        -13.804,
+        -66.9877,
+        49.3688
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 4879849,
+      "degree": 5
+    },
+    {
+      "id": "mexico",
+      "names": {
+        "es-AR": "México",
+        "en": "Mexico"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 7,
+      "centroid": [
+        -99.2897,
+        22.9477
+      ],
+      "labelAnchor": [
+        -100.4517,
+        22.9538
+      ],
+      "bbox": [
+        -117.129,
+        12.9796,
+        -73.0105,
+        32.7157
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2348489,
+      "degree": 2
+    },
+    {
+      "id": "groenlandia",
+      "names": {
+        "es-AR": "Groenlandia",
+        "en": "Greenland"
+      },
+      "continent": "america_del_norte",
+      "polygonCount": 3,
+      "centroid": [
+        -41.8279,
+        73.0695
+      ],
+      "labelAnchor": [
+        -41.8037,
+        73.0841
+      ],
+      "bbox": [
+        -72.8197,
+        59.8155,
+        -11.4247,
+        83.5996
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2146684,
+      "degree": 3
+    },
+    {
+      "id": "alemania",
+      "names": {
+        "es-AR": "Alemania",
+        "en": "Germany"
+      },
+      "continent": "europa",
+      "polygonCount": 3,
+      "centroid": [
+        10.1342,
+        50.6559
+      ],
+      "labelAnchor": [
+        10.1131,
+        50.5686
+      ],
+      "bbox": [
+        2.5254,
+        45.8304,
+        17.1488,
+        57.7378
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 588771,
+      "degree": 4
+    },
+    {
+      "id": "espana",
+      "names": {
+        "es-AR": "España",
+        "en": "Spain"
+      },
+      "continent": "europa",
+      "polygonCount": 4,
+      "centroid": [
+        -4.2737,
+        40.2044
+      ],
+      "labelAnchor": [
+        -4.242,
+        40.2751
+      ],
+      "bbox": [
+        -16.904,
+        28.0077,
+        3.4614,
+        43.7653
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 589355,
+      "degree": 3
+    },
+    {
+      "id": "francia",
+      "names": {
+        "es-AR": "Francia",
+        "en": "France"
+      },
+      "continent": "europa",
+      "polygonCount": 4,
+      "centroid": [
+        -6.4387,
+        43.0345
+      ],
+      "labelAnchor": [
+        2.4612,
+        46.5722
+      ],
+      "bbox": [
+        -54.6179,
+        -21.357,
+        55.8384,
+        51.0969
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 631801,
+      "degree": 3
+    },
+    {
+      "id": "gran_bretana",
+      "names": {
+        "es-AR": "Gran Bretaña",
+        "en": "Great Britain"
+      },
+      "continent": "europa",
+      "polygonCount": 4,
+      "centroid": [
+        -3.9666,
+        53.7813
+      ],
+      "labelAnchor": [
+        -2.4091,
+        53.8227
+      ],
+      "bbox": [
+        -10.3915,
+        50.0219,
+        1.7478,
+        58.6499
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 301920,
+      "degree": 3
+    },
+    {
+      "id": "islandia",
+      "names": {
+        "es-AR": "Islandia",
+        "en": "Iceland"
+      },
+      "continent": "europa",
+      "polygonCount": 1,
+      "centroid": [
+        -18.5765,
+        64.9977
+      ],
+      "labelAnchor": [
+        -18.5765,
+        64.9977
+      ],
+      "bbox": [
+        -24.4532,
+        63.4068,
+        -13.5811,
+        66.5232
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 100905,
+      "degree": 3
+    },
+    {
+      "id": "italia",
+      "names": {
+        "es-AR": "Italia",
+        "en": "Italy"
+      },
+      "continent": "europa",
+      "polygonCount": 3,
+      "centroid": [
+        14.8673,
+        43.5008
+      ],
+      "labelAnchor": [
+        15.2164,
+        43.9797
+      ],
+      "bbox": [
+        6.6295,
+        36.6872,
+        22.9772,
+        47.0823
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 525959,
+      "degree": 2
+    },
+    {
+      "id": "polonia",
+      "names": {
+        "es-AR": "Polonia",
+        "en": "Poland"
+      },
+      "continent": "europa",
+      "polygonCount": 1,
+      "centroid": [
+        19.8557,
+        52.4273
+      ],
+      "labelAnchor": [
+        19.8557,
+        52.4273
+      ],
+      "bbox": [
+        12.0907,
+        47.7633,
+        28.2009,
+        58.0637
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 567915,
+      "degree": 4
+    },
+    {
+      "id": "rusia",
+      "names": {
+        "es-AR": "Rusia",
+        "en": "Russia"
+      },
+      "continent": "europa",
+      "polygonCount": 17,
+      "centroid": [
+        38.6711,
+        56.8446
+      ],
+      "labelAnchor": [
+        38.6616,
+        56.308
+      ],
+      "bbox": [
+        4.9086,
+        38.4111,
+        68.9425,
+        81.1989
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 6026649,
+      "degree": 5
+    },
+    {
+      "id": "suecia",
+      "names": {
+        "es-AR": "Suecia",
+        "en": "Sweden"
+      },
+      "continent": "europa",
+      "polygonCount": 2,
+      "centroid": [
+        16.265,
+        62.4004
+      ],
+      "labelAnchor": [
+        16.2474,
+        62.4334
+      ],
+      "bbox": [
+        11.1475,
+        55.3455,
+        24.1544,
+        69.0367
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 441610,
+      "degree": 2
+    },
+    {
+      "id": "arabia",
+      "names": {
+        "es-AR": "Arabia",
+        "en": "Arabia"
+      },
+      "continent": "asia",
+      "polygonCount": 2,
+      "centroid": [
+        46.3617,
+        23.8795
+      ],
+      "labelAnchor": [
+        46.3527,
+        23.892
+      ],
+      "bbox": [
+        34.6161,
+        12.3182,
+        59.838,
+        37.3723
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 3226262,
+      "degree": 2
+    },
+    {
+      "id": "aral",
+      "names": {
+        "es-AR": "Aral",
+        "en": "Aral"
+      },
+      "continent": "asia",
+      "polygonCount": 1,
+      "centroid": [
+        66.2797,
+        45.8754
+      ],
+      "labelAnchor": [
+        66.2797,
+        45.8754
+      ],
+      "bbox": [
+        46.6079,
+        35.1708,
+        87.3243,
+        55.3901
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 3971513,
+      "degree": 5
+    },
+    {
+      "id": "china",
+      "names": {
+        "es-AR": "China",
+        "en": "China"
+      },
+      "continent": "asia",
+      "polygonCount": 4,
+      "centroid": [
+        103.1207,
+        35.3734
+      ],
+      "labelAnchor": [
+        102.9809,
+        35.4974
+      ],
+      "bbox": [
+        73.6081,
+        18.2183,
+        134.7511,
+        53.5547
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 7496312,
+      "degree": 8
+    },
+    {
+      "id": "gobi",
+      "names": {
+        "es-AR": "Gobi",
+        "en": "Gobi"
+      },
+      "continent": "asia",
+      "polygonCount": 1,
+      "centroid": [
+        105.1654,
+        40.511
+      ],
+      "labelAnchor": [
+        105.1654,
+        40.511
+      ],
+      "bbox": [
+        89.4339,
+        31.5474,
+        126.0571,
+        53.3166
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2314943,
+      "degree": 3
+    },
+    {
+      "id": "india",
+      "names": {
+        "es-AR": "India",
+        "en": "India"
+      },
+      "continent": "asia",
+      "polygonCount": 4,
+      "centroid": [
+        80.0026,
+        22.5482
+      ],
+      "labelAnchor": [
+        79.9644,
+        22.8589
+      ],
+      "bbox": [
+        68.1649,
+        5.9502,
+        97.336,
+        35.4952
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 3353346,
+      "degree": 4
+    },
+    {
+      "id": "iran",
+      "names": {
+        "es-AR": "Irán",
+        "en": "Iran"
+      },
+      "continent": "asia",
+      "polygonCount": 1,
+      "centroid": [
+        60.9444,
+        32.2397
+      ],
+      "labelAnchor": [
+        60.9444,
+        32.2397
+      ],
+      "bbox": [
+        44.023,
+        23.7521,
+        77.0498,
+        39.7674
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 3137321,
+      "degree": 7
+    },
+    {
+      "id": "israel",
+      "names": {
+        "es-AR": "Israel",
+        "en": "Israel"
+      },
+      "continent": "asia",
+      "polygonCount": 2,
+      "centroid": [
+        37.4561,
+        33.6434
+      ],
+      "labelAnchor": [
+        37.5778,
+        33.6002
+      ],
+      "bbox": [
+        32.3013,
+        29.1913,
+        42.3598,
+        37.2888
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 322253,
+      "degree": 3
+    },
+    {
+      "id": "japon",
+      "names": {
+        "es-AR": "Japón",
+        "en": "Japan"
+      },
+      "continent": "asia",
+      "polygonCount": 4,
+      "centroid": [
+        137.8317,
+        37.5891
+      ],
+      "labelAnchor": [
+        137.8866,
+        36.6356
+      ],
+      "bbox": [
+        129.5815,
+        31.0155,
+        145.8321,
+        45.5102
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 361855,
+      "degree": 2
+    },
+    {
+      "id": "kamchatka",
+      "names": {
+        "es-AR": "Kamchatka",
+        "en": "Kamchatka"
+      },
+      "continent": "asia",
+      "polygonCount": 15,
+      "centroid": [
+        139.6329,
+        62.9566
+      ],
+      "labelAnchor": [
+        138.8373,
+        62.8688
+      ],
+      "bbox": [
+        105.5405,
+        42.3032,
+        190.2709,
+        76.1998
+      ],
+      "crossesAntimeridian": true,
+      "areaKm2": 6104198,
+      "degree": 4
+    },
+    {
+      "id": "malasia",
+      "names": {
+        "es-AR": "Malasia",
+        "en": "Malaya"
+      },
+      "continent": "asia",
+      "polygonCount": 13,
+      "centroid": [
+        104.7062,
+        15.3049
+      ],
+      "labelAnchor": [
+        101.1866,
+        16.7819
+      ],
+      "bbox": [
+        92.1807,
+        0.862,
+        126.5935,
+        28.5104
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2518546,
+      "degree": 3
+    },
+    {
+      "id": "mongolia",
+      "names": {
+        "es-AR": "Mongolia",
+        "en": "Mongolia"
+      },
+      "continent": "asia",
+      "polygonCount": 1,
+      "centroid": [
+        103.1231,
+        46.9565
+      ],
+      "labelAnchor": [
+        103.1231,
+        46.9565
+      ],
+      "bbox": [
+        87.7419,
+        41.5958,
+        119.8974,
+        52.1176
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1560143,
+      "degree": 5
+    },
+    {
+      "id": "siberia",
+      "names": {
+        "es-AR": "Siberia",
+        "en": "Siberia"
+      },
+      "continent": "asia",
+      "polygonCount": 1,
+      "centroid": [
+        104.3572,
+        54.7439
+      ],
+      "labelAnchor": [
+        104.3572,
+        54.7439
+      ],
+      "bbox": [
+        77.7842,
+        49.0764,
+        122.1258,
+        64.2827
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2043341,
+      "degree": 6
+    },
+    {
+      "id": "taimir",
+      "names": {
+        "es-AR": "Taimir",
+        "en": "Taymyr"
+      },
+      "continent": "asia",
+      "polygonCount": 4,
+      "centroid": [
+        95.3433,
+        65.8952
+      ],
+      "labelAnchor": [
+        95.3233,
+        65.6877
+      ],
+      "bbox": [
+        78.4826,
+        51.7821,
+        113.8709,
+        81.2811
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2305131,
+      "degree": 2
+    },
+    {
+      "id": "tartaria",
+      "names": {
+        "es-AR": "Tartaria",
+        "en": "Tartary"
+      },
+      "continent": "asia",
+      "polygonCount": 2,
+      "centroid": [
+        73.3044,
+        60.9608
+      ],
+      "labelAnchor": [
+        73.3057,
+        60.9509
+      ],
+      "bbox": [
+        57.138,
+        51.9756,
+        89.4447,
+        73.5136
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2447252,
+      "degree": 3
+    },
+    {
+      "id": "turquia",
+      "names": {
+        "es-AR": "Turquía",
+        "en": "Turkey"
+      },
+      "continent": "asia",
+      "polygonCount": 5,
+      "centroid": [
+        32.0667,
+        39.7527
+      ],
+      "labelAnchor": [
+        35.4129,
+        39.0627
+      ],
+      "bbox": [
+        19.28,
+        34.934,
+        44.8186,
+        44.2388
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1066298,
+      "degree": 6
+    },
+    {
+      "id": "egipto",
+      "names": {
+        "es-AR": "Egipto",
+        "en": "Egypt"
+      },
+      "continent": "africa",
+      "polygonCount": 1,
+      "centroid": [
+        29.8749,
+        26.4679
+      ],
+      "labelAnchor": [
+        29.8749,
+        26.4679
+      ],
+      "bbox": [
+        24.7124,
+        21.9948,
+        36.8698,
+        31.6547
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1001958,
+      "degree": 6
+    },
+    {
+      "id": "etiopia",
+      "names": {
+        "es-AR": "Etiopía",
+        "en": "Ethiopia"
+      },
+      "continent": "africa",
+      "polygonCount": 1,
+      "centroid": [
+        35.2621,
+        9.6049
+      ],
+      "labelAnchor": [
+        35.2621,
+        9.6049
+      ],
+      "bbox": [
+        21.8252,
+        -4.6928,
+        51.3851,
+        22.1883
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 5297114,
+      "degree": 4
+    },
+    {
+      "id": "madagascar",
+      "names": {
+        "es-AR": "Madagascar",
+        "en": "Madagascar"
+      },
+      "continent": "africa",
+      "polygonCount": 3,
+      "centroid": [
+        46.9402,
+        -19.6475
+      ],
+      "labelAnchor": [
+        46.7408,
+        -19.3209
+      ],
+      "bbox": [
+        43.2634,
+        -49.7086,
+        70.5553,
+        -12.0786
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 602352,
+      "degree": 2
+    },
+    {
+      "id": "sahara",
+      "names": {
+        "es-AR": "Sahara",
+        "en": "Sahara"
+      },
+      "continent": "africa",
+      "polygonCount": 1,
+      "centroid": [
+        5.0346,
+        19.1527
+      ],
+      "labelAnchor": [
+        5.0346,
+        19.1527
+      ],
+      "bbox": [
+        -17.534,
+        1.6752,
+        27.4017,
+        37.3403
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 13189368,
+      "degree": 5
+    },
+    {
+      "id": "sudafrica",
+      "names": {
+        "es-AR": "Sudáfrica",
+        "en": "South Africa"
+      },
+      "continent": "africa",
+      "polygonCount": 3,
+      "centroid": [
+        26.0388,
+        -17.7075
+      ],
+      "labelAnchor": [
+        26.0497,
+        -17.7221
+      ],
+      "bbox": [
+        11.7199,
+        -34.785,
+        40.8334,
+        -1.0026
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 6923599,
+      "degree": 2
+    },
+    {
+      "id": "zaire",
+      "names": {
+        "es-AR": "Zaire",
+        "en": "Zaire"
+      },
+      "continent": "africa",
+      "polygonCount": 2,
+      "centroid": [
+        21.4917,
+        -2.3922
+      ],
+      "labelAnchor": [
+        21.4998,
+        -2.3959
+      ],
+      "bbox": [
+        8.4331,
+        -13.4545,
+        31.2753,
+        5.3125
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 2968696,
+      "degree": 4
+    },
+    {
+      "id": "australia",
+      "names": {
+        "es-AR": "Australia",
+        "en": "Australia"
+      },
+      "continent": "oceania",
+      "polygonCount": 7,
+      "centroid": [
+        134.296,
+        -25.7619
+      ],
+      "labelAnchor": [
+        134.2071,
+        -25.6325
+      ],
+      "bbox": [
+        113.1833,
+        -43.6121,
+        153.6153,
+        -10.7084
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 7696936,
+      "degree": 4
+    },
+    {
+      "id": "borneo",
+      "names": {
+        "es-AR": "Borneo",
+        "en": "Borneo"
+      },
+      "continent": "oceania",
+      "polygonCount": 42,
+      "centroid": [
+        135.2023,
+        -8.9643
+      ],
+      "labelAnchor": [
+        140.9113,
+        -5.3412
+      ],
+      "bbox": [
+        108.9065,
+        -47.2577,
+        180,
+        4.3711
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 1962254,
+      "degree": 2
+    },
+    {
+      "id": "java",
+      "names": {
+        "es-AR": "Java",
+        "en": "Java"
+      },
+      "continent": "oceania",
+      "polygonCount": 9,
+      "centroid": [
+        114.2556,
+        -7.9673
+      ],
+      "labelAnchor": [
+        109.9189,
+        -7.3014
+      ],
+      "bbox": [
+        105.2417,
+        -10.3436,
+        127.2955,
+        -5.9042
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 210583,
+      "degree": 1
+    },
+    {
+      "id": "sumatra",
+      "names": {
+        "es-AR": "Sumatra",
+        "en": "Sumatra"
+      },
+      "continent": "oceania",
+      "polygonCount": 7,
+      "centroid": [
+        101.6423,
+        -0.4859
+      ],
+      "labelAnchor": [
+        101.519,
+        -0.4489
+      ],
+      "bbox": [
+        95.2084,
+        -5.9056,
+        108.3953,
+        5.6286
+      ],
+      "crossesAntimeridian": false,
+      "areaKm2": 457094,
+      "degree": 2
+    }
+  ]
+}

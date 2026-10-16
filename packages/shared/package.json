@@ -1,0 +1,16 @@
+{
+  "name": "@conqueror/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tipos, protocolo de mensajes y esquemas de validacion compartidos",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

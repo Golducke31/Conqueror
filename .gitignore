@@ -1,0 +1,34 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Datos crudos de Natural Earth (dominio publico, se bajan con `pnpm map:fetch`)
+data/ne/
+
+# Salidas generadas del pipeline de mapa: se versionan a proposito, salvo la
+# vista previa (pesada y regenerable con `pnpm map:preview`).
+packages/map-data/generated/map-preview.*
+
+# Copia servida al cliente: la regenera `pnpm map:build`.
+apps/client/public/map/
+
+# Entorno y sistema
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+
+# Editores
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.local
+
+# Memoria local del agente (no es cache temporal: es estado de trabajo)
+.workbuddy-ai/
+
+# Playwright
+test-results/
+playwright-report/

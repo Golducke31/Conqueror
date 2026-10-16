@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Conqueror - juego de conquista mundial por turnos para 2 a 6 jugadores."
+    />
+    <title>Conqueror</title>
+  </head>
+  <body class="bg-hilo text-algodon antialiased">
+    <!-- Lienzo 3D: todo el render del tablero ocurre aca. -->
+    <canvas id="lienzo" class="fixed inset-0 block h-full w-full" aria-hidden="true"></canvas>
+
+    <!-- HUD en DOM sobre el lienzo. -->
+    <div id="hud" class="pointer-events-none fixed inset-0 flex flex-col"></div>
+
+    <!-- Panel de depuracion, se activa con ?debug=1 -->
+    <div
+      id="depuracion"
+      class="pointer-events-none fixed bottom-2 left-2 hidden rounded-md border border-lana-3 bg-hilo/85 px-3 py-2 font-mono text-xs leading-relaxed text-algodon/80"
+      role="status"
+      aria-live="off"
+    ></div>
+
+    <noscript>
+      <p class="p-6 text-algodon">
+        Este juego necesita JavaScript activado para dibujar el tablero en 3D.
+      </p>
+    </noscript>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

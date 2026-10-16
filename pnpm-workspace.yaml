@@ -1,0 +1,16 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm bloquea los scripts de postinstall por defecto (desde v10).
+# esbuild los necesita para verificar/enlazar su binario nativo, y Vite lo usa.
+allowBuilds:
+  esbuild: true
+
+# Excepciones al enfriamiento de versiones recien publicadas.
+minimumReleaseAgeExclude:
+  - '@vitest/coverage-v8@5.0.5'
+  - '@vitest/mocker@5.0.5'
+  - '@vitest/spy@5.0.5'
+  - lenis@1.3.27
+  - vitest@5.0.5

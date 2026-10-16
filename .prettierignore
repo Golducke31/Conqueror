@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+data/ne/
+packages/map-data/generated/
+apps/client/public/map/
+test-results/
+.workbuddy-ai/
+*.geojson
