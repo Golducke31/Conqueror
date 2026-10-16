@@ -51,6 +51,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         combat: 'debug/combat.html',
+        sounds: 'debug/sounds.html',
       },
     },
   },

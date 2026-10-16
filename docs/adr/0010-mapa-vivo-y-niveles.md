@@ -113,5 +113,5 @@ para poder verla sin esperar a que la máquina se cuelgue.
   **después** del momento pedido: los momentos de `scripts/capture-c4.ts` se
   eligen contra el reloj real para que el cuadro real caiga en la ventana de
   coreografía buscada. La etiqueta «Ataque» del HUD lleva `text-transform:
-  uppercase`, así que `innerText` devuelve «ATAQUE» (las aserciones del script
+uppercase`, así que `innerText` devuelve «ATAQUE» (las aserciones del script
   son insensibles a mayúsculas).

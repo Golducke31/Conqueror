@@ -26,6 +26,13 @@
  * NADA de esto decide resultados: el `BattleRoundResolved` ya viene resuelto por
  * el motor y `planRound`/`planConquest`/`planSeaCrossing` (puros) lo traducen a
  * planes de tiempos. Ver docs/adr/0006-combate-visual-no-decide.md
+ *
+ * C5 agrega las SENALES DE AUDIO: si se le pasa un receptor (`AudioSink`, ver
+ * audio/audioManager.ts), la coreografia emite un `cue` en el mismo instante en
+ * que ocurre cada evento visual —dados, duelos por tipo, marchas, desembarco,
+ * estandarte, conquista—. El sonido es consecuencia del mismo evento que mueve
+ * las fichas, nunca al reves. Sin receptor, la escena es muda y no pasa nada
+ * (ver ADR 0011).
  */
 
 import gsap from 'gsap';
@@ -41,12 +48,13 @@ import { UNIT_ORDER, UnitBatch, type UnitInstance } from '../tokens/UnitBatch.js
 import { SPECTACLE_PROFILES, type SpectacleProfile } from './spectacle.js';
 import { planConquest, type ConquestPlan } from './choreography/conquest.js';
 import { planSeaCrossing, type SeaCrossingPlan } from './choreography/sea.js';
-import { planRound, type RoundPlan } from './choreography/round.js';
+import { planRound, type DuelAction, type RoundPlan } from './choreography/round.js';
 import { DiceLayer, type DiePlacement } from './dice/DiceLayer.js';
 import { ParticlePool, type ParticleBurst } from './fx/ParticlePool.js';
 import { createBannerLayer } from './BannerLayer.js';
 import { ShipLayer } from './units/ShipLayer.js';
 import { createQualityController } from './choreography/quality.js';
+import type { AudioSink } from './audio/audioManager.js';
 
 /** Separacion entre la linea de frente y cada escuadra. */
 const LINE_GAP = 30;
@@ -62,6 +70,23 @@ const DICE_SCALE = 13;
 
 /** Altura a la que flotan los dados sobre el suelo. */
 const DICE_LIFT = 0.9;
+
+/** Sonido de la accion de cada tipo de duelo, al arrancar el enfrentamiento. */
+const SONIDO_ACCION: Readonly<Record<DuelAction, string>> = {
+  volley: 'infantry.volley',
+  charge: 'cavalry.charge',
+  cannon: 'cannon.fire',
+};
+
+/**
+ * Sonido del impacto (y de la baja, en el caso de la infanteria: ahi no hay
+ * choque, la salva ya se oyo al arrancar el duelo).
+ */
+const SONIDO_IMPACTO: Readonly<Record<DuelAction, string>> = {
+  volley: 'infantry.death',
+  charge: 'cavalry.impact',
+  cannon: 'cannon.impact',
+};
 
 /** Distancia de la linea de navios a la costa defensora. */
 const SHIP_STANDOFF = 26;
@@ -171,6 +196,11 @@ export interface BattleSceneOptions {
   readonly scene: GameScene;
   /** Tope de unidades por bando en batalla. */
   readonly maxUnits: number;
+  /**
+   * Receptor de senales de audio (opcional). Si falta, la escena es muda y
+   * el juego corre normal: el sonido nunca es requisito.
+   */
+  readonly audio?: AudioSink;
 }
 
 export interface BattleScene {
@@ -298,6 +328,20 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
   const attackerDicePos: Vector3[] = [];
   const defenderDicePos: Vector3[] = [];
+
+  /** Centro de un conjunto de posiciones (para el paneo de una senal). */
+  const centroDe = (posiciones: readonly Vector3[]): Vector3 => {
+    if (posiciones.length === 0) return new Vector3();
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    for (const pos of posiciones) {
+      x += pos.x;
+      y += pos.y;
+      z += pos.z;
+    }
+    return new Vector3(x / posiciones.length, y / posiciones.length, z / posiciones.length);
+  };
 
   /** Recoloca las instancias interpolando marcha -> formacion y aplicando caidas. */
   const applyInstances = (): void => {
@@ -618,9 +662,15 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     };
 
     if (plan.sail.duration <= 0) {
-      // Rapido (o salto): los navios fonden directamente.
+      // Rapido (o salto): los navios fondan directamente.
       placeShips(1);
     } else {
+      // Navegacion: suena mientras los navios cruzan.
+      timeline.call(
+        () => options.audio?.cue('ship.sail', startPositions[0]),
+        undefined,
+        plan.sail.start,
+      );
       timeline.to(
         shipState,
         {
@@ -637,6 +687,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       // Andanada: puro espectaculo. Las bajas las decide el motor en la ronda.
       timeline.call(
         () => {
+          options.audio?.cue('ship.cannon', anchorCenter);
           for (const anchorPosition of anchorPositions) {
             spawnImpact('cannon', anchorPosition, 0.8);
           }
@@ -649,6 +700,13 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
     // Desembarco: las tropas arrancan en la playa, frente a los navios.
     const landingCenter = anchorCenter.clone().addScaledVector(sailDir, SHIP_STANDOFF * 0.5);
+    if (plan.landing.duration > 0) {
+      timeline.call(
+        () => options.audio?.cue('ship.landing', landingCenter),
+        undefined,
+        plan.landing.start,
+      );
+    }
     return { timeline, plan, landingCenter };
   };
 
@@ -749,6 +807,12 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       // El despliegue (o desembarco, si la llegada fue por mar) arranca cuando
       // termina la travesia: las tropas bajan de los navios ya en la playa.
       const deployStart = sea !== null ? sea.plan.landing.start : 0;
+      // El avance de la escuadra suena donde arranca: sobre el frente.
+      timeline.call(
+        () => options.audio?.cue('infantry.march', frontCenter),
+        undefined,
+        deployStart,
+      );
       const state = { progress: 0 };
       timeline.to(
         state,
@@ -793,6 +857,26 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       const diceOpacity = { v: 0 };
       const rollState = { t: 0 };
       dice.setOpacity(0);
+
+      // Los dados de cada bando suenan donde estan: el paneo los separa.
+      const dadosAtacante = centroDe(attackerDicePos);
+      const dadosDefensor = centroDe(defenderDicePos);
+      timeline.call(
+        () => {
+          options.audio?.cue('dice.roll', dadosAtacante);
+          options.audio?.cue('dice.roll', dadosDefensor);
+        },
+        undefined,
+        plan.diceRoll.start,
+      );
+      timeline.call(
+        () => {
+          options.audio?.cue('dice.land', dadosAtacante);
+          options.audio?.cue('dice.land', dadosDefensor);
+        },
+        undefined,
+        plan.diceLand.start,
+      );
       timeline.to(
         diceOpacity,
         {
@@ -843,6 +927,9 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
         const casualty = casualtyRefs[duel.casualtyIndex];
 
         if (actor !== undefined) {
+          // La accion del duelista suena al arrancar el enfrentamiento.
+          const sonidoAccion = SONIDO_ACCION[duel.action];
+          timeline.call(() => options.audio?.cue(sonidoAccion, actor.base), undefined, duel.start);
           timeline.to(
             actor,
             {
@@ -859,7 +946,15 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
 
         timeline.call(
           () => {
+            // Destello del par comparado: stinger del lado que gana el par.
+            const dadoAtacante = attackerDicePos[duel.pairIndex] ?? dadosAtacante;
+            const dadoDefensor = defenderDicePos[duel.pairIndex] ?? dadosDefensor;
+            options.audio?.cue(
+              duel.winner === 'attacker' ? 'dice.win' : 'dice.lose',
+              dadoAtacante.clone().add(dadoDefensor).multiplyScalar(0.5),
+            );
             if (casualty !== undefined) {
+              options.audio?.cue(SONIDO_IMPACTO[duel.action], casualty.base);
               spawnImpact(duel.action, casualty.base, profile.particleScale);
               if (profile.cameraShake) options.scene.rig.shake(2.2, 0.16);
             }
@@ -904,6 +999,13 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       const anchorRight = new Vector3(toAnchor.z, 0, -toAnchor.x);
       const slots = formationPositions(units.length, anchorWorld, toAnchor, anchorRight, 9);
 
+      // La escuadra avanza al territorio conquistado: suena la marcha.
+      timeline.call(
+        () => options.audio?.cue('infantry.march', units[0]?.base ?? anchorWorld),
+        undefined,
+        0,
+      );
+
       units.forEach((unit, index) => {
         const slot = slots[index] ?? anchorWorld;
         const targetRotation =
@@ -937,6 +1039,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
         () => {
           // La bandera mira hacia la camara, que esta del lado del atacante.
           const rotationY = Math.atan2(-forward.x, -forward.z);
+          options.audio?.cue('flag.plant', anchorWorld);
           banner.plant({ x: target.anchorX, z: target.anchorZ, color: target.color, rotationY });
           bannerPlanted = true;
           banner.group.scale.set(0.25, 0.25, 0.25);
@@ -957,6 +1060,12 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       );
 
       // --- Onda de cambio de dueno: barre desde el frente. -------------------
+      // La fanfarria suena cuando la onda cambia el dueno del territorio.
+      timeline.call(
+        () => options.audio?.cue('territory.conquered', anchorWorld),
+        undefined,
+        plan.wave.start,
+      );
       const waveTimeline = options.scene.playOwnershipWave({
         territoryIndex: target.territoryIndex,
         originX: conquestOptions.waveOriginX,
@@ -1025,6 +1134,7 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
       // Si la secuencia de conquista se salto, el estandarte no quedo plantado:
       // se planta ahora, como parte de la llegada.
       if (!bannerPlanted) {
+        options.audio?.cue('flag.plant', new Vector3(marchOptions.toX, baseY, marchOptions.toZ));
         banner.plant({
           x: marchOptions.toX,
           z: marchOptions.toZ,
@@ -1064,6 +1174,8 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
           marchOptions.onComplete();
         },
       });
+      // La columna en marcha suena desde donde arranca.
+      timeline.call(() => options.audio?.cue('infantry.march', from), undefined, 0);
       timeline.to(
         banner.group.scale,
         { x: 1, y: 1, z: 1, duration: 0.3, ease: 'back.out(2.2)' },

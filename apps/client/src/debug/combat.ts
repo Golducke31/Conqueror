@@ -9,6 +9,12 @@
  * onda de cambio de dueño con estandarte, y la marcha posterior de los
  * ejercitos que el jugador decide mover (la dispara el boton, no el director).
  *
+ * En C5 la escena suena: el `AudioManager` (audio/audioManager.ts) se crea aca
+ * y se le pasa a la escena de batalla. Arranca mudo —no hay archivos en el
+ * manifiesto— y el panel muestra el registro en vivo de las senales emitidas
+ * en cada momento de la coreografia, para sincronizar sonidos aunque todavia
+ * no existan (plan de combate, seccion 15).
+ *
  * OJO: aca los eventos estan SIMULADOS. El motor de reglas de verdad llega en el
  * Hito 3; cuando exista, el sandbox pasa a pedirle los eventos a `apply()` y
  * este simulador se borra.
@@ -16,7 +22,7 @@
 
 import '../styles/main.css';
 
-import { Color } from 'three';
+import { Color, Vector3 } from 'three';
 import type { BattleRoundResolved, GameEvent } from '@conqueror/rules';
 import { estimateBattleOdds } from '@conqueror/rules';
 import { DEFAULT_RULES_CONFIG } from '@conqueror/shared';
@@ -29,6 +35,7 @@ import { createBattleScene } from '../render/combat/BattleScene.js';
 import { createCombatDirector } from '../render/combat/CombatDirector.js';
 import { SPECTACLE_PROFILES, type SpectacleLevel } from '../render/combat/spectacle.js';
 import { createHeatModel } from '../render/combat/heat/heatModel.js';
+import { createAudioManager, type CueLogEntry } from '../render/combat/audio/audioManager.js';
 import { createGameScene } from '../scenes/game/GameScene.js';
 
 function nodo(etiqueta: string, clase: string, texto?: string): HTMLElement {
@@ -104,7 +111,36 @@ async function main(): Promise<void> {
     throw new Error('Falta el lienzo o el HUD');
   }
 
+  const params = new URLSearchParams(window.location.search);
   const renderer = createRenderer(canvas);
+
+  // Audio: el manager arranca mudo (no hay archivos en el manifiesto) y suena
+  // recien cuando el usuario los agrega. El paneo se calcula con la camara.
+  const audio = createAudioManager({
+    debug: params.get('debug') === '1',
+    panOf: (mundo) => {
+      const punto = new Vector3(mundo.x, mundo.y, mundo.z);
+      const direccion = new Vector3();
+      renderer.camera.getWorldDirection(direccion);
+      // Detras de la camara no hay paneo: va al centro.
+      if (punto.clone().sub(renderer.camera.position).dot(direccion) <= 0) return 0;
+      punto.project(renderer.camera);
+      return punto.x;
+    },
+    onCue: (entrada) => mostrarSenal(entrada),
+  });
+  void audio.load();
+
+  // Politica de autoplay: el contexto arranca bloqueado y se desbloquea con
+  // el primer gesto del usuario.
+  const desbloquear = (): void => {
+    void audio.unlock();
+    window.removeEventListener('pointerdown', desbloquear);
+    window.removeEventListener('keydown', desbloquear);
+  };
+  window.addEventListener('pointerdown', desbloquear);
+  window.addEventListener('keydown', desbloquear);
+
   const scene = await createGameScene({
     renderer,
     canvas,
@@ -128,9 +164,22 @@ async function main(): Promise<void> {
   const heat = createHeatModel();
   const aplicarCalor = (eventos: readonly GameEvent[]): void => {
     if (heat.apply(eventos)) scene.setHeat(new Map(heat.entries()));
+    // Ambiente: el calor del territorio batallado cruza las capas de sonido.
+    audio.setAmbienceHeat(calorBatalla(eventos));
   };
 
-  const battle = createBattleScene({ renderer, scene, maxUnits: 16 });
+  /** Calor del ultimo territorio que mencionan los eventos (el campo de batalla). */
+  function calorBatalla(eventos: readonly GameEvent[]): number {
+    for (let i = eventos.length - 1; i >= 0; i -= 1) {
+      const evento = eventos[i];
+      if (evento === undefined) continue;
+      if (evento.type === 'TERRITORY_CONQUERED') return heat.get(evento.territory);
+      if (evento.type === 'BATTLE_ROUND_RESOLVED') return heat.get(evento.to);
+    }
+    return 0;
+  }
+
+  const battle = createBattleScene({ renderer, scene, maxUnits: 16, audio });
   renderer.scene.add(battle.group);
 
   let lastRound: BattleRoundResolved | null = null;
@@ -201,8 +250,12 @@ async function main(): Promise<void> {
   });
 
   // Cuando el director queda libre se refresca el panel: la fila de marcha
-  // habilita su boton recien cuando la secuencia de conquista termino.
-  director.onIdle(() => actualizarPanel());
+  // habilita su boton recien cuando la secuencia de conquista termino. El
+  // ambiente se apaga: ya no hay batalla en curso.
+  director.onIdle(() => {
+    audio.setAmbienceHeat(0);
+    actualizarPanel();
+  });
 
   // ---- Interfaz -----------------------------------------------------------
 
@@ -260,6 +313,16 @@ async function main(): Promise<void> {
   );
   filaCalidad.append(checkCalidad, nodo('span', '', t('sandbox.calidadForzada')));
 
+  // Silencio rapido para el sandbox (los volumenes finos estan en /debug/sounds).
+  const checkSilencio = document.createElement('input');
+  checkSilencio.type = 'checkbox';
+  checkSilencio.className = 'h-3.5 w-3.5 accent-grana';
+  const filaSilencio = nodo(
+    'label',
+    'col-span-2 flex items-center gap-2 text-[11px] text-algodon/60',
+  );
+  filaSilencio.append(checkSilencio, nodo('span', '', t('sandbox.silencio')));
+
   const campo = (label: string, control: HTMLElement): HTMLElement => {
     const box = nodo('label', 'flex flex-col gap-1');
     box.append(
@@ -276,11 +339,28 @@ async function main(): Promise<void> {
     campo(t('sandbox.defensor'), inputDefensor),
     campo(t('sandbox.nivel'), selectorNivel),
     filaCalidad,
+    filaSilencio,
   );
   panel.append(grid);
 
   const info = nodo('p', 'mt-3 text-[11px] leading-relaxed text-algodon/60');
   panel.append(info);
+
+  // Registro en vivo de las senales de audio: sirve para sincronizar sonidos
+  // aunque todavia no existan los archivos (plan de combate, seccion 15).
+  const registro = nodo(
+    'div',
+    'mt-1 max-h-24 overflow-y-auto rounded border border-lana-3/60 bg-hilo/60 p-2 font-mono text-[10px] leading-relaxed text-algodon/70',
+  );
+  panel.append(
+    nodo('div', 'mt-3 text-[11px] uppercase tracking-wider text-algodon/50', t('sounds.titulo')),
+    registro,
+  );
+
+  function mostrarSenal(entrada: CueLogEntry): void {
+    registro.prepend(nodo('div', '', `${entrada.slot} → ${t(`sounds.estado.${entrada.status}`)}`));
+    while (registro.childElementCount > 8) registro.lastElementChild?.remove();
+  }
 
   const acciones = nodo('div', 'mt-3 flex flex-wrap gap-2');
   const boton = (label: string, primario = false): HTMLButtonElement => {
@@ -456,6 +536,8 @@ async function main(): Promise<void> {
     actualizarPanel();
   });
 
+  checkSilencio.addEventListener('change', () => audio.setMuted(checkSilencio.checked));
+
   botonRonda.addEventListener('click', () => {
     if (ocupado()) return;
     const from = selectorOrigen.value;
@@ -574,6 +656,7 @@ async function main(): Promise<void> {
     scene.setGameState(gameState);
     heat.reset();
     scene.setHeat(new Map());
+    audio.setAmbienceHeat(0);
     lastRound = null;
     conquista = null;
     marching = false;

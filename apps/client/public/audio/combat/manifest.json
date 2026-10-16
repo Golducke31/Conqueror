@@ -1,0 +1,112 @@
+{
+  "dice.roll": {
+    "files": [],
+    "volume": 1,
+    "pitchVariance": 0.06,
+    "maxVoices": 2,
+    "cooldownMs": 0
+  },
+  "dice.land": {
+    "files": [],
+    "volume": 0.9,
+    "pitchVariance": 0.1,
+    "maxVoices": 3,
+    "cooldownMs": 0
+  },
+  "dice.win": {
+    "files": [],
+    "volume": 0.9,
+    "pitchVariance": 0.05,
+    "maxVoices": 2,
+    "cooldownMs": 80
+  },
+  "dice.lose": {
+    "files": [],
+    "volume": 0.9,
+    "pitchVariance": 0.05,
+    "maxVoices": 2,
+    "cooldownMs": 80
+  },
+  "infantry.march": {
+    "files": [],
+    "volume": 0.7
+  },
+  "infantry.volley": {
+    "files": [],
+    "volume": 0.95,
+    "pitchVariance": 0.05,
+    "maxVoices": 3
+  },
+  "infantry.death": {
+    "files": [],
+    "volume": 0.6,
+    "pitchVariance": 0.08,
+    "maxVoices": 3
+  },
+  "cavalry.charge": {
+    "files": [],
+    "volume": 0.8
+  },
+  "cavalry.impact": {
+    "files": [],
+    "volume": 0.95,
+    "maxVoices": 2
+  },
+  "cannon.fire": {
+    "files": [],
+    "volume": 0.95,
+    "pitchVariance": 0.04,
+    "maxVoices": 2,
+    "cooldownMs": 100
+  },
+  "cannon.impact": {
+    "files": [],
+    "volume": 0.9,
+    "pitchVariance": 0.05,
+    "maxVoices": 3
+  },
+  "ship.sail": {
+    "files": [],
+    "volume": 0.5
+  },
+  "ship.cannon": {
+    "files": [],
+    "volume": 0.9,
+    "maxVoices": 2
+  },
+  "ship.landing": {
+    "files": [],
+    "volume": 0.85,
+    "maxVoices": 2
+  },
+  "flag.plant": {
+    "files": [],
+    "volume": 0.9,
+    "maxVoices": 2,
+    "cooldownMs": 200
+  },
+  "territory.conquered": {
+    "files": [],
+    "volume": 1,
+    "maxVoices": 1,
+    "cooldownMs": 400
+  },
+  "battle.ambience.low": {
+    "files": [],
+    "volume": 0.5,
+    "bus": "ambience",
+    "maxVoices": 1
+  },
+  "battle.ambience.mid": {
+    "files": [],
+    "volume": 0.5,
+    "bus": "ambience",
+    "maxVoices": 1
+  },
+  "battle.ambience.high": {
+    "files": [],
+    "volume": 0.5,
+    "bus": "ambience",
+    "maxVoices": 1
+  }
+}

@@ -11,6 +11,8 @@
  *     idioma, y el cambio de idioma re-renderiza
  *   - al hacer clic en un territorio se abre su detalle
  *   - el sandbox `/debug/combat` tambien carga sin errores
+ *   - el sandbox `/debug/sounds` lista los slots del manifiesto y todos
+ *     figuran sin archivo (el juego viaja en silencio, ADR 0011)
  *
  * Deja capturas en `test-results/`.
  *
@@ -44,9 +46,33 @@ const MIME: Readonly<Record<string, string>> = {
   '.map': 'application/json; charset=utf-8',
 };
 
+/** Los 19 slots del manifiesto de audio (ADR 0011). */
+const SLOTS_SONIDO: readonly string[] = [
+  'dice.roll',
+  'dice.land',
+  'dice.win',
+  'dice.lose',
+  'infantry.march',
+  'infantry.volley',
+  'infantry.death',
+  'cavalry.charge',
+  'cavalry.impact',
+  'cannon.fire',
+  'cannon.impact',
+  'ship.sail',
+  'ship.cannon',
+  'ship.landing',
+  'flag.plant',
+  'territory.conquered',
+  'battle.ambience.low',
+  'battle.ambience.mid',
+  'battle.ambience.high',
+];
+
 /** Reescribe las rutas de depuracion sin `.html`, igual que el dev server. */
 function rewriteDebugRoute(url: string): string {
   if (url === '/debug/combat' || url === '/debug/combat/') return '/debug/combat.html';
+  if (url === '/debug/sounds' || url === '/debug/sounds/') return '/debug/sounds.html';
   return url;
 }
 
@@ -208,6 +234,33 @@ async function main(): Promise<void> {
     failures.push({ check: 'sandbox', detail: 'no se encontro el boton de tirar ronda' });
   }
 
+  // Sandbox de sonidos: la pagina lista los slots del manifiesto y, como el
+  // manifiesto viaja sin archivos (ADR 0011), todos tienen que figurar sin
+  // archivo: el juego corre en silencio hasta que se agreguen.
+  await page.goto(`${url}debug/sounds`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  const sonidosText = (await hud.innerText().catch(() => '')) || '';
+  const faltan = SLOTS_SONIDO.filter((slot) => !sonidosText.includes(slot));
+  if (faltan.length > 0) {
+    failures.push({
+      check: 'sonidos',
+      detail: `faltan slots en la pagina: ${faltan.join(', ')}`,
+    });
+  }
+  const sinArchivo = await page.evaluate(
+    () =>
+      Array.from(document.querySelectorAll('#hud span')).filter(
+        (span) => span.textContent === 'Sin archivo' || span.textContent === 'No file',
+      ).length,
+  );
+  if (sinArchivo !== SLOTS_SONIDO.length) {
+    failures.push({
+      check: 'sonidos',
+      detail: `${sinArchivo} de ${SLOTS_SONIDO.length} slots figuran sin archivo`,
+    });
+  }
+  await page.screenshot({ path: join(OUTPUT_DIR, 'smoke-sonidos.png') });
+
   if (consoleErrors.length > 0) {
     failures.push({ check: 'consola', detail: consoleErrors.slice(0, 5).join(' | ') });
   }
@@ -215,7 +268,7 @@ async function main(): Promise<void> {
   await browser.close();
   await close();
 
-  for (const name of ['smoke-tablero.png', 'smoke-combate.png']) {
+  for (const name of ['smoke-tablero.png', 'smoke-combate.png', 'smoke-sonidos.png']) {
     const path = join(OUTPUT_DIR, name);
     if (existsSync(path)) {
       const size = (await readFile(path)).byteLength;
@@ -230,7 +283,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log('[smoke] OK: tablero dibujando, HUD con jugadores, seleccion, i18n y sandbox');
+  console.log('[smoke] OK: tablero dibujando, HUD con jugadores, seleccion, i18n y sandboxes');
 }
 
 main().catch((error: unknown) => {

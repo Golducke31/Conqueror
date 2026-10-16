@@ -75,8 +75,30 @@ const esAR: Dictionary = {
   'sandbox.calidad.plena': 'plena',
   'sandbox.calidad.reducida': 'reducida',
   'sandbox.calidadForzada': 'Forzar calidad reducida',
+  'sandbox.silencio': 'Silenciar',
   'sandbox.ayuda':
     'El sandbox es solo para desarrollo: los eventos están simulados, el motor de reglas llega en el Hito 3.',
+  'sounds.titulo': 'Señales de audio',
+  'sounds.pagina.titulo': 'Prueba de sonidos',
+  'sounds.pagina.ayuda':
+    'Un botón por slot del manifiesto. En rojo, los slots sin archivo: el juego corre en silencio hasta que los agregues.',
+  'sounds.bus.efectos': 'Efectos',
+  'sounds.bus.ambiente': 'Ambiente',
+  'sounds.silencio': 'Silencio',
+  'sounds.probar': 'Probar',
+  'sounds.sinArchivo': 'Sin archivo',
+  'sounds.listo': 'Listo',
+  'sounds.calor': 'Calor de batalla',
+  'sounds.consejo':
+    'Los archivos van en public/audio/combat/ con el nombre <slot_con_guion_bajo>_<n>.mp3, y se cargan en el manifiesto. Registrálos en docs/CREDITS.md.',
+  'sounds.manifiesto.roto': 'El manifiesto de sonidos tiene problemas:',
+  'sounds.manifiesto.ausente': 'No se encontró el manifiesto de sonidos.',
+  'sounds.estado.sono': 'Sonó',
+  'sounds.estado.sin-archivo': 'Sin archivo',
+  'sounds.estado.sin-desbloquear': 'Contexto bloqueado',
+  'sounds.estado.descartada-voces': 'Descartada (voces)',
+  'sounds.estado.descartada-cooldown': 'Descartada (cooldown)',
+  'sounds.estado.decodificando': 'Decodificando',
 };
 
 const en: Dictionary = {
@@ -140,8 +162,30 @@ const en: Dictionary = {
   'sandbox.qualityFull': 'full',
   'sandbox.qualityReduced': 'reduced',
   'sandbox.forceQuality': 'Force reduced quality',
+  'sandbox.silencio': 'Mute',
   'sandbox.help':
     'Sandbox is for development only: events are simulated, the rules engine arrives in Milestone 3.',
+  'sounds.titulo': 'Audio cues',
+  'sounds.pagina.titulo': 'Sound test',
+  'sounds.pagina.ayuda':
+    'One button per manifest slot. Slots with no file are red: the game runs in silence until you add them.',
+  'sounds.bus.efectos': 'Effects',
+  'sounds.bus.ambiente': 'Ambience',
+  'sounds.silencio': 'Mute',
+  'sounds.probar': 'Play',
+  'sounds.sinArchivo': 'No file',
+  'sounds.listo': 'Ready',
+  'sounds.calor': 'Battle heat',
+  'sounds.consejo':
+    'Files go in public/audio/combat/ named <slot_with_underscores>_<n>.mp3, and are listed in the manifest. Register them in docs/CREDITS.md.',
+  'sounds.manifiesto.roto': 'The sound manifest has problems:',
+  'sounds.manifiesto.ausente': 'The sound manifest was not found.',
+  'sounds.estado.sono': 'Played',
+  'sounds.estado.sin-archivo': 'No file',
+  'sounds.estado.sin-desbloquear': 'Context locked',
+  'sounds.estado.descartada-voces': 'Dropped (voices)',
+  'sounds.estado.descartada-cooldown': 'Dropped (cooldown)',
+  'sounds.estado.decodificando': 'Decoding',
 };
 
 const dictionaries: Readonly<Record<Locale, Dictionary>> = { 'es-AR': esAR, en };

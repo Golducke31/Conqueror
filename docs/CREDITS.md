@@ -68,6 +68,12 @@ Convención: `apps/client/public/audio/combat/<slot_con_guion_bajo>_<n>.mp3`
 compatibilidad entre navegadores (si usás OGG, incluí también un respaldo).
 Efectos en mono, normalizados con margen de seguridad.
 
+Los archivos se declaran en el manifiesto `apps/client/public/audio/combat/manifest.json`
+(un slot por sonido, con rutas relativas al manifiesto). El que se entrega trae
+todos los slots con `files: []`: el juego arranca en silencio y suena en el
+momento correcto en cuanto se agregan archivos. Ver `docs/adr/0011-audio.md`
+y la página de prueba `/debug/sounds` (solo en desarrollo).
+
 **El usuario es responsable de que los sonidos sean propios o con licencia.**
 Completar la tabla al agregarlos:
 
