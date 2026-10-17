@@ -68,7 +68,9 @@ async function main(): Promise<void> {
   if (!setupText.includes('Conqueror')) {
     fallas.push({ check: 'setup', detail: 'no aparece el nombre del juego' });
   }
-  if ((await page.locator('#hud button', { hasText: 'Empezar' }).count()) === 0) {
+  // Se busca por atributo, no por texto: el idioma depende del navegador
+  // (en CI arranca en ingles y el boton dice "Start match").
+  if ((await page.locator('#hud button[data-accion="empezar"]').count()) === 0) {
     fallas.push({ check: 'setup', detail: 'no aparece el boton de empezar partida' });
   }
   await page.close();

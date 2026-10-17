@@ -196,7 +196,7 @@ export function renderSetup(contenedor: HTMLElement, opciones: SetupOpciones): v
           botPlayers: players.filter((player) => player.bot).map((player) => player.id),
         });
       },
-      { primario: true },
+      { primario: true, dato: { accion: 'empezar' } },
     ),
     boton(t('setup.todosBots'), todosBots, { pequeno: true }),
     nodo('span', 'text-[11px] text-algodon/45', t('setup.notaBots')),
