@@ -18,8 +18,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
+        # Sin `version`: la version la fija `packageManager` del package.json.
+        # Pasar las dos da "Multiple versions of pnpm specified" y rompe el job.
         with:
-          version: 11
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
