@@ -44,6 +44,7 @@ import { createHighlightMaterial, createTerritoryMaterial } from '../../render/m
 import { createAttackArrow } from '../../render/combat/heat/attackArrow.js';
 import { NumberLayer } from '../../render/tokens/NumberLayer.js';
 import { SquadLayer } from '../../render/tokens/SquadLayer.js';
+import { createUnitModels, type UnitModels } from '../../render/tokens/models/unitModels.js';
 import { buildBoard, territoryAnchors, type BoardBuild } from '../../map/boardGeometry.js';
 import { createCameraRig, type CameraRig, type FocusOptions } from '../../map/cameraRig.js';
 import { loadMapData, type LoadedMapData } from '../../map/loadMapData.js';
@@ -60,6 +61,13 @@ export interface GameSceneOptions {
   readonly mapMaxUnits: number;
   /** Configuracion de reglas: la usa la probabilidad de conquista estimada. */
   readonly rules: RulesConfig;
+  /** Avisos por consola de la carga de modelos. */
+  readonly debug?: boolean;
+  /**
+   * Modelos ya creados por quien llama. El sandbox los comparte entre el mapa y
+   * la batalla para no pedirlos dos veces; si falta, la escena crea los suyos.
+   */
+  readonly models?: UnitModels;
 }
 
 /** Objetivo de ataque posible bajo el cursor, con su probabilidad estimada. */
@@ -75,6 +83,12 @@ export interface GameScene {
   readonly board: BoardBuild;
   readonly rig: CameraRig;
   readonly group: Group;
+  /**
+   * Modelos finales de las unidades. La carga se pide en diferido, despues de
+   * armar el tablero, y no bloquea nada: mientras llegan (o si fallan) las
+   * fichas siguen con las primitivas (ADR 0012).
+   */
+  readonly models: UnitModels;
   setGameState(state: MockGameState): void;
   selected(): TerritoryId | null;
   hovered(): TerritoryId | null;
@@ -222,6 +236,17 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
     baseY: board.relief + 0.4,
   });
   squads.group.renderOrder = 4;
+
+  // Modelos finales: se piden en diferido y, cuando llegan, reemplazan a las
+  // primitivas de las fichas del mapa. Un tipo que falle se queda como estaba.
+  const ownsModels = options.models === undefined;
+  const models =
+    options.models ??
+    createUnitModels({
+      renderer: options.renderer.renderer,
+      ...(options.debug === undefined ? {} : { debug: options.debug }),
+    });
+  models.subscribe((estado) => squads.setGeometries(estado.models));
 
   const numbers = new NumberLayer();
   numbers.group.renderOrder = 5;
@@ -445,6 +470,10 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
     options.renderer.requestRender();
   };
 
+  // Recien ahora, con el tablero armado, se piden los modelos. No se espera la
+  // respuesta: el mapa ya es jugable con las primitivas (ADR 0012).
+  void models.load();
+
   return {
     data,
     board,
@@ -512,6 +541,8 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
       seaRouteMaterial.opacity = 0.55 * value;
       options.renderer.requestRender();
     },
+
+    models,
 
     visibleUnits(): number {
       return squads.visibleUnits();
@@ -631,6 +662,8 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
       oddsListeners.clear();
       attackArrow.dispose();
       squads.dispose();
+      // Los modelos inyectados los libera quien los creo.
+      if (ownsModels) models.dispose();
       numbers.dispose();
       highlightMaterial.dispose();
       territoryMaterial.dispose();

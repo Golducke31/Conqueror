@@ -55,6 +55,8 @@ import { createBannerLayer } from './BannerLayer.js';
 import { ShipLayer } from './units/ShipLayer.js';
 import { createQualityController } from './choreography/quality.js';
 import type { AudioSink } from './audio/audioManager.js';
+import type { UnitModelSet } from '../tokens/models/modelLoader.js';
+import type { UnitModels } from '../tokens/models/unitModels.js';
 
 /** Separacion entre la linea de frente y cada escuadra. */
 const LINE_GAP = 30;
@@ -201,6 +203,11 @@ export interface BattleSceneOptions {
    * el juego corre normal: el sonido nunca es requisito.
    */
   readonly audio?: AudioSink;
+  /**
+   * Modelos finales (opcional). Si falta, la escena usa las primitivas; si
+   * estan, la escena se suscribe y cambia las geometrias cuando llegan.
+   */
+  readonly models?: UnitModels;
 }
 
 export interface BattleScene {
@@ -234,6 +241,11 @@ export interface BattleScene {
     readonly unitCap: number;
     readonly particleScale: number;
   };
+  /**
+   * Cambia las primitivas por los modelos finales. Los tipos que no vengan
+   * siguen con su primitiva: la carga puede fallar sin romper la batalla.
+   */
+  setUnitModels(models: UnitModelSet): void;
   visibleUnits(): number;
   visibleShips(): number;
   attackerRoster(): readonly UnitType[];
@@ -289,6 +301,16 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
   const ships = new ShipLayer({ capacity: 8 });
   group.add(batch.group, dice.group, particles.group, banner.group, ships.group);
   group.visible = false;
+
+  // Modelos finales: se aplican los que ya esten y se cambian solos cuando la
+  // carga diferida termine. Los tipos que falten siguen con su primitiva.
+  const aplicarModelos = (models: UnitModelSet): void => {
+    batch.setGeometries(models);
+    const navio = models.ship;
+    if (navio !== undefined) ships.setGeometry(navio);
+  };
+  aplicarModelos(options.models?.state().models ?? {});
+  options.models?.subscribe((estado) => aplicarModelos(estado.models));
 
   let attackerSide: BattleSideInternal | null = null;
   let defenderSide: BattleSideInternal | null = null;
@@ -1331,6 +1353,11 @@ export function createBattleScene(options: BattleSceneOptions): BattleScene {
     tick(deltaSeconds: number): void {
       particles.update(deltaSeconds);
       if (particles.aliveCount() > 0) options.renderer.requestRender();
+    },
+
+    setUnitModels(models: UnitModelSet): void {
+      aplicarModelos(models);
+      options.renderer.requestRender();
     },
 
     visibleUnits(): number {

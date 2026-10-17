@@ -36,6 +36,7 @@ import { createCombatDirector } from '../render/combat/CombatDirector.js';
 import { SPECTACLE_PROFILES, type SpectacleLevel } from '../render/combat/spectacle.js';
 import { createHeatModel } from '../render/combat/heat/heatModel.js';
 import { createAudioManager, type CueLogEntry } from '../render/combat/audio/audioManager.js';
+import { createUnitModels } from '../render/tokens/models/unitModels.js';
 import { createGameScene } from '../scenes/game/GameScene.js';
 
 function nodo(etiqueta: string, clase: string, texto?: string): HTMLElement {
@@ -114,6 +115,14 @@ async function main(): Promise<void> {
   const params = new URLSearchParams(window.location.search);
   const renderer = createRenderer(canvas);
 
+  // Modelos finales: se piden en diferido y, mientras llegan, la escena usa las
+  // primitivas. Si el manifiesto esta vacio (lo normal hoy) no cambia nada.
+  const models = createUnitModels({
+    renderer: renderer.renderer,
+    debug: params.get('debug') === '1',
+  });
+  void models.load();
+
   // Audio: el manager arranca mudo (no hay archivos en el manifiesto) y suena
   // recien cuando el usuario los agrega. El paneo se calcula con la camara.
   const audio = createAudioManager({
@@ -147,6 +156,8 @@ async function main(): Promise<void> {
     reducedMotion: false,
     mapMaxUnits: 5,
     rules: DEFAULT_RULES_CONFIG,
+    // El mapa y la batalla comparten los mismos modelos: se piden una sola vez.
+    models,
   });
   renderer.scene.add(scene.group);
 
@@ -179,7 +190,7 @@ async function main(): Promise<void> {
     return 0;
   }
 
-  const battle = createBattleScene({ renderer, scene, maxUnits: 16, audio });
+  const battle = createBattleScene({ renderer, scene, maxUnits: 16, audio, models });
   renderer.scene.add(battle.group);
 
   let lastRound: BattleRoundResolved | null = null;

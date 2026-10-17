@@ -272,12 +272,15 @@ function montarDepuracion(handle: RendererHandle, scene: GameScene): void {
     const stats = handle.stats();
     const contexto = handle.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
     const apuntado = app.hovered ?? app.selected;
+    const modelos = scene.models.state();
+    const cargados = modelos.reports.filter((report) => report.status === 'loaded').length;
     lineas.textContent = [
       `${t('debug.fps')}: ${stats.fps}`,
       `${t('debug.drawcalls')}: ${stats.drawCalls}`,
       `${t('debug.triangulos')}: ${stats.triangles}`,
       `${t('debug.contexto')}: ${contexto}`,
       `${t('debug.unidades')}: ${scene.visibleUnits()}`,
+      `${t('debug.modelos')}: ${modelos.reports.length === 0 ? '-' : `${cargados}/${modelos.reports.length}`}`,
       `${t('debug.calor')}: ${apuntado === null ? '-' : scene.heatOf(apuntado).toFixed(2)}`,
       `${t('debug.seleccionado')}: ${app.selected ?? '-'}`,
       `${t('debug.apuntado')}: ${app.hovered ?? '-'}`,

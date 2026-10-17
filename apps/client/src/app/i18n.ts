@@ -52,6 +52,7 @@ const esAR: Dictionary = {
   'debug.calidad': 'Calidad',
   'debug.seleccionado': 'Seleccionado',
   'debug.apuntado': 'Apuntado',
+  'debug.modelos': 'Modelos',
   'sandbox.titulo': 'Sandbox de combate',
   'sandbox.origen': 'Origen',
   'sandbox.destino': 'Destino',
@@ -99,6 +100,26 @@ const esAR: Dictionary = {
   'sounds.estado.descartada-voces': 'Descartada (voces)',
   'sounds.estado.descartada-cooldown': 'Descartada (cooldown)',
   'sounds.estado.decodificando': 'Decodificando',
+  'models.pagina.titulo': 'Prueba de modelos',
+  'models.pagina.ayuda':
+    'Una fila por tipo de unidad, en los cuatro colores de jugador. Sin modelo cargado se muestra la primitiva, que es el respaldo del juego.',
+  'models.tipo.infantry': 'Infantería',
+  'models.tipo.cavalry': 'Caballería',
+  'models.tipo.artillery': 'Artillería',
+  'models.tipo.ship': 'Navío',
+  'models.estado.loaded': 'Cargado',
+  'models.estado.absent': 'Sin modelo',
+  'models.estado.missing': 'Sin archivo',
+  'models.estado.invalid': 'Inválido',
+  'models.estado.error': 'Error',
+  'models.triangulos': 'Triángulos',
+  'models.alto': 'Alto',
+  'models.primitiva': 'Primitiva',
+  'models.girar': 'Girar',
+  'models.manifiesto.roto': 'El manifiesto de modelos tiene problemas:',
+  'models.manifiesto.ausente': 'No se encontró el manifiesto de modelos.',
+  'models.consejo':
+    'Los archivos van en public/models/combat/ con el nombre <tipo>.glb, y se cargan en el manifiesto. Registrá su licencia en docs/CREDITS.md.',
 };
 
 const en: Dictionary = {
@@ -186,6 +207,26 @@ const en: Dictionary = {
   'sounds.estado.descartada-voces': 'Dropped (voices)',
   'sounds.estado.descartada-cooldown': 'Dropped (cooldown)',
   'sounds.estado.decodificando': 'Decoding',
+  'models.pagina.titulo': 'Model test',
+  'models.pagina.ayuda':
+    'One row per unit type, in the four player colours. With no model loaded you see the primitive, which is the game fallback.',
+  'models.tipo.infantry': 'Infantry',
+  'models.tipo.cavalry': 'Cavalry',
+  'models.tipo.artillery': 'Artillery',
+  'models.tipo.ship': 'Ship',
+  'models.estado.loaded': 'Loaded',
+  'models.estado.absent': 'No model',
+  'models.estado.missing': 'No file',
+  'models.estado.invalid': 'Invalid',
+  'models.estado.error': 'Error',
+  'models.triangulos': 'Triangles',
+  'models.alto': 'Height',
+  'models.primitiva': 'Primitive',
+  'models.girar': 'Spin',
+  'models.manifiesto.roto': 'The model manifest has problems:',
+  'models.manifiesto.ausente': 'The model manifest was not found.',
+  'models.consejo':
+    'Files go in public/models/combat/ named <type>.glb, and are listed in the manifest. Register their licence in docs/CREDITS.md.',
 };
 
 const dictionaries: Readonly<Record<Locale, Dictionary>> = { 'es-AR': esAR, en };

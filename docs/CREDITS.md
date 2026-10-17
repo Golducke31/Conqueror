@@ -99,6 +99,30 @@ Completar la tabla al agregarlos:
 | `battle.ambience.mid`  | Ambiente con `battleHeat` medio  | loop 8–20 s          |         |                  |
 | `battle.ambience.high` | Ambiente con `battleHeat` alto   | loop 8–20 s          |         |                  |
 
+## Modelos de las unidades (los aporta el usuario)
+
+El proyecto **no incluye ni descarga modelos**: mientras no existan, el juego usa
+las **primitivas** de `apps/client/src/render/tokens/unitMeshes.ts` y el navío de
+`units/shipMesh.ts`. Un tipo sin modelo no produce error: sigue con su primitiva.
+
+Convención: `apps/client/public/models/combat/<tipo>.glb`. Formato **glTF 2.0**
+(comprimido con Meshopt o Draco; texturas KTX2 opcionales). Los archivos se
+declaran en el manifiesto `apps/client/public/models/combat/manifest.json`, que
+en la entrega **no declara ningún tipo**. El contrato de atributos, los campos
+del manifiesto y los presupuestos están en `docs/art-spec.md`; las decisiones, en
+`docs/adr/0012-arte-final.md`. Página de prueba: `/debug/models` (solo en
+desarrollo).
+
+**Verificá la licencia de cualquier pack de terceros** (por ejemplo Kenney o
+Quaternius, ambos con packs CC0) y completá la tabla al agregarlos:
+
+| Tipo        | Presupuesto | Archivo | Autor / licencia |
+| ----------- | ----------- | ------- | ---------------- |
+| `infantry`  | 500 tris    |         |                  |
+| `cavalry`   | 500 tris    |         |                  |
+| `artillery` | 800 tris    |         |                  |
+| `ship`      | 1200 tris   |         |                  |
+
 ## Si se activa el Hito 8 (modo fotorrealista)
 
 Antes de implementarlo hay que revisar con el humano los costos y terminos del

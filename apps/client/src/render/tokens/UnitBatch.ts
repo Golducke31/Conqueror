@@ -11,6 +11,7 @@ import { DynamicDrawUsage, Group, InstancedMesh, Object3D } from 'three';
 import type { UnitType } from '@conqueror/rules';
 import { createUnitGeometries } from './unitMeshes.js';
 import { createUnitMaterial, type UnitMaterialHandle } from './unitMaterial.js';
+import type { UnitSkin } from './models/modelLoader.js';
 
 /** Orden de dibujo fijo, de mayor a menor nivel. */
 export const UNIT_ORDER: readonly UnitType[] = ['artillery', 'cavalry', 'infantry'];
@@ -37,20 +38,45 @@ export class UnitBatch {
   readonly group = new Group();
 
   private readonly meshes: Record<UnitType, InstancedMesh>;
-  private readonly material: UnitMaterialHandle;
+  private readonly materials: Record<UnitType, UnitMaterialHandle>;
   private readonly scratch = new Object3D();
   private readonly counts: Record<UnitType, number> = { artillery: 0, cavalry: 0, infantry: 0 };
+  /** Si la geometria de cada malla es propia (primitiva) y hay que disponerla. */
+  private readonly owned: Record<UnitType, boolean> = {
+    artillery: true,
+    cavalry: true,
+    infantry: true,
+  };
 
   constructor(options: UnitBatchOptions) {
-    this.material = createUnitMaterial();
     const geometries = createUnitGeometries();
     // Orden YXZ: primero se inclina (caida) y despues se orienta (formacion).
     this.scratch.rotation.order = 'YXZ';
 
+    // Un material por tipo: el shader es el mismo (three comparte el programa),
+    // pero asi cada tipo puede llevar su propia textura.
+    this.materials = {
+      artillery: createUnitMaterial(),
+      cavalry: createUnitMaterial(),
+      infantry: createUnitMaterial(),
+    };
+
     this.meshes = {
-      artillery: new InstancedMesh(geometries.artillery, this.material.material, options.capacity),
-      cavalry: new InstancedMesh(geometries.cavalry, this.material.material, options.capacity),
-      infantry: new InstancedMesh(geometries.infantry, this.material.material, options.capacity),
+      artillery: new InstancedMesh(
+        geometries.artillery,
+        this.materials.artillery.material,
+        options.capacity,
+      ),
+      cavalry: new InstancedMesh(
+        geometries.cavalry,
+        this.materials.cavalry.material,
+        options.capacity,
+      ),
+      infantry: new InstancedMesh(
+        geometries.infantry,
+        this.materials.infantry.material,
+        options.capacity,
+      ),
     };
 
     for (const type of UNIT_ORDER) {
@@ -59,6 +85,28 @@ export class UnitBatch {
       mesh.frustumCulled = false;
       mesh.count = 0;
       this.group.add(mesh);
+    }
+  }
+
+  /**
+   * Cambia las geometrias por los modelos finales, cargados en diferido. Los
+   * tipos que no vengan siguen con su primitiva.
+   *
+   * Las geometrias inyectadas NO se disponen: las comparten otras capas (el
+   * mapa y la batalla). Solo se disponen las primitivas que creo este lote.
+   */
+  setGeometries(models: Readonly<Partial<Record<UnitType, UnitSkin>>>): void {
+    for (const type of UNIT_ORDER) {
+      const skin = models[type];
+      this.materials[type].setMap(skin?.map ?? null, skin?.maskChannel ?? 'none');
+      if (skin === undefined) continue;
+
+      const mesh = this.meshes[type];
+      const anterior = mesh.geometry;
+      mesh.geometry = skin.geometry;
+      if (this.owned[type]) anterior.dispose();
+      this.owned[type] = false;
+      mesh.computeBoundingSphere();
     }
   }
 
@@ -91,15 +139,15 @@ export class UnitBatch {
   }
 
   setTime(seconds: number): void {
-    this.material.setTime(seconds);
+    for (const type of UNIT_ORDER) this.materials[type].setTime(seconds);
   }
 
   setDim(value: number): void {
-    this.material.setDim(value);
+    for (const type of UNIT_ORDER) this.materials[type].setDim(value);
   }
 
   setOpacity(value: number): void {
-    this.material.setOpacity(value);
+    for (const type of UNIT_ORDER) this.materials[type].setOpacity(value);
   }
 
   visibleUnits(): number {
@@ -109,9 +157,10 @@ export class UnitBatch {
   dispose(): void {
     for (const type of UNIT_ORDER) {
       const mesh = this.meshes[type];
-      mesh.geometry.dispose();
+      // Solo se dispone lo propio: los modelos cargados los comparten otras capas.
+      if (this.owned[type]) mesh.geometry.dispose();
       this.group.remove(mesh);
+      this.materials[type].dispose();
     }
-    this.material.dispose();
   }
 }

@@ -15,6 +15,7 @@ import type { Color, Group } from 'three';
 import { composeSquad, type UnitType } from '@conqueror/rules';
 import type { TerritoryId } from '@conqueror/shared';
 import { UNIT_ORDER, UnitBatch, type UnitInstance } from './UnitBatch.js';
+import type { UnitSkin } from './models/modelLoader.js';
 
 /** Orden de formacion, de la fila de atras hacia adelante. */
 const FORMATION_ORDER: readonly UnitType[] = ['artillery', 'cavalry', 'infantry'];
@@ -117,6 +118,14 @@ export class SquadLayer {
   /** Posicion y radio del bloque de fichas de un territorio. */
   layoutOf(territory: TerritoryId): SquadLayoutInfo | undefined {
     return this.layout.get(territory);
+  }
+
+  /**
+   * Cambia las fichas del mapa por los modelos finales, cargados en diferido.
+   * Los tipos que no vengan siguen con su primitiva.
+   */
+  setGeometries(models: Readonly<Partial<Record<UnitType, UnitSkin>>>): void {
+    this.batch.setGeometries(models);
   }
 
   setTime(seconds: number): void {

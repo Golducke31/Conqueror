@@ -1,0 +1,17 @@
+{
+  "_comentario": [
+    "Manifiesto de los modelos finales (ADR 0012). Este archivo es de ejemplo:",
+    "el juego NO trae modelos, corre con las primitivas. Para usar los modelos",
+    "finales, poné cada .glb en public/models/combat/ y declaralo acá.",
+    "Contrato de los modelos: docs/art-spec.md.",
+    "  - file:            ruta relativa a este manifiesto (.glb o .gltf).",
+    "  - scale:           escala aplicada al modelo (por defecto 1).",
+    "  - yOffset:         alza vertical, DESPUÉS de la escala (por defecto 0).",
+    "  - colorAttribute:  atributo con el color base (por defecto \"color\").",
+    "  - maskAttribute:   atributo con la máscara de uniforme (por defecto \"_MASK\").",
+    "  - maskValue:       máscara si el modelo no trae el atributo (por defecto 0).",
+    "  - baseColor:       color plano si el modelo no trae color (por defecto #ffffff).",
+    "  - maskChannel:     canal del atlas con la máscara: none|r|g|b|a (por defecto none).",
+    "Los tipos que no estén acá siguen con su primitiva."
+  ]
+}

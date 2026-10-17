@@ -36,6 +36,8 @@ pnpm map:preview      # escribe packages/map-data/generated/map-preview.svg
 | `/`             | Tablero interactivo con datos de prueba. `?jugadores=2..6` cambia la cantidad. |
 | `/?debug=1`     | Lo mismo, con el overlay de FPS, draw calls y unidades visibles.               |
 | `/debug/combat` | Sandbox de combate: dispara rondas entre dos territorios vecinos.              |
+| `/debug/sounds` | Prueba de sonidos: un botón por slot del manifiesto.                           |
+| `/debug/models` | Prueba de modelos: los cuatro tipos, en los cuatro colores de jugador.         |
 
 ## Comandos
 

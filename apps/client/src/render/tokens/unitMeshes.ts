@@ -62,7 +62,9 @@ function capsule(
   color: Color,
   mask: number,
 ): Part {
-  const geometry = new CapsuleGeometry(radius, length, 4, 8);
+  // Poca teselacion a proposito: la especificacion de los modelos finales pide
+  // < 500 triangulos por soldado y la primitiva tambien tiene que entrar ahi.
+  const geometry = new CapsuleGeometry(radius, length, 2, 6);
   geometry.translate(x, y, z);
   return { geometry, color, mask };
 }

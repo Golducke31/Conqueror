@@ -15,6 +15,7 @@ import { DynamicDrawUsage, Group, InstancedMesh, Object3D } from 'three';
 
 import { createShipGeometry } from './shipMesh.js';
 import { createUnitMaterial, type UnitMaterialHandle } from '../../tokens/unitMaterial.js';
+import type { UnitSkin } from '../../tokens/models/modelLoader.js';
 
 export interface ShipInstance {
   readonly x: number;
@@ -37,6 +38,8 @@ export class ShipLayer {
   private readonly mesh: InstancedMesh;
   private readonly material: UnitMaterialHandle;
   private readonly scratch = new Object3D();
+  /** Si la geometria es la primitiva propia y hay que disponerla. */
+  private owned = true;
 
   constructor(options: ShipLayerOptions = {}) {
     this.material = createUnitMaterial();
@@ -49,6 +52,19 @@ export class ShipLayer {
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
     this.group.add(this.mesh);
+  }
+
+  /**
+   * Cambia la primitiva por el modelo final del navio, cargado en diferido.
+   * La geometria inyectada no se dispone: la comparten otras capas.
+   */
+  setGeometry(skin: UnitSkin): void {
+    const anterior = this.mesh.geometry;
+    this.mesh.geometry = skin.geometry;
+    if (this.owned) anterior.dispose();
+    this.owned = false;
+    this.material.setMap(skin.map, skin.maskChannel);
+    this.mesh.computeBoundingSphere();
   }
 
   /** Reemplaza todas las instancias. */
@@ -79,7 +95,7 @@ export class ShipLayer {
   }
 
   dispose(): void {
-    this.mesh.geometry.dispose();
+    if (this.owned) this.mesh.geometry.dispose();
     this.material.dispose();
     this.group.remove(this.mesh);
   }

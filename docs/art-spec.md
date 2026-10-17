@@ -1,7 +1,8 @@
 # Especificación de arte — unidades y tablero
 
 Documento para quien modele o consiga los assets finales (Hito C6). Hasta
-entonces el juego usa **primitivas** (ver "Fase placeholder").
+entonces el juego usa **primitivas** (ver "Fase placeholder"). El sistema que
+carga los modelos ya está en pie: ver "Cómo se cargan" al final.
 
 ## Unidades
 
@@ -28,11 +29,9 @@ jugador tiene color propio y un emblema genérico (estrella, león, águila).
 ## Máscara de uniforme (teñido por jugador)
 
 El color del jugador se aplica **solo** sobre una máscara de uniforme. En el
-modelo final eso es un **vertex color** o un **canal de textura**:
-
-- el canal de máscara vale 1 en la casaca, el pantalón y las piezas de tela del
-  jugador;
-- vale 0 en cuero, metal, madera, piel y pelo.
+modelo final eso es un **atributo de vértice** `_MASK` (float: 1 en la casaca,
+el pantalón y las piezas de tela del jugador; 0 en cuero, metal, madera, piel y
+pelo), o bien **un canal del atlas** declarado en el manifiesto.
 
 El resto del modelo va en tonos tierra y neutros, así el color del jugador se lee
 a distancia. Además del color, cada jugador lleva un **emblema distinto** para
@@ -58,6 +57,9 @@ distingan**:
 - Caballería: prisma alargado (caballo) + cápsula encima (jinete).
 - Artillería: cilindro sobre dos discos (ruedas) + curena.
 
+Las primitivas también entran en el presupuesto de triángulos de la tabla, porque
+son el respaldo: infantería 300, caballería 228, artillería 316 y navío 92.
+
 ## Presupuestos (Hito C6)
 
 - ≤ 16 unidades visibles por bando (8 en móvil).
@@ -65,3 +67,42 @@ distingan**:
 - 60 fps en un móvil de gama media.
 - Los modelos y texturas se cargan **en diferido** al iniciar la partida; si
   fallan, el juego sigue con las primitivas como respaldo.
+
+El primer y el segundo presupuesto se verifican solos (`combat/budget.test.ts`:
+triángulos de cada primitiva contra la tabla de arriba y una malla instanciada
+por tipo). El de fps se mira a mano con el overlay de depuración (`?debug=1`),
+que muestra FPS, draw calls, triángulos y cuántos modelos cargaron.
+
+## Cómo se cargan
+
+El juego **no trae modelos**: corre con las primitivas. Para usar los finales:
+
+1. Poné cada archivo en `apps/client/public/models/combat/` con el nombre del
+   tipo (`infantry.glb`, `cavalry.glb`, `artillery.glb`, `ship.glb`).
+2. Declaralo en `apps/client/public/models/combat/manifest.json`:
+
+```json
+{
+  "infantry": { "file": "infantry.glb" },
+  "cavalry": { "file": "cavalry.glb", "scale": 1.2, "maskChannel": "a" }
+}
+```
+
+| Campo            | Por defecto | Qué hace                                                     |
+| ---------------- | ----------- | ------------------------------------------------------------ |
+| `file`           | —           | Ruta relativa al manifiesto (`.glb` o `.gltf`). Obligatorio. |
+| `scale`          | `1`         | Escala aplicada al modelo.                                   |
+| `yOffset`        | `0`         | Alza vertical, **después** de la escala.                     |
+| `colorAttribute` | `color`     | Atributo con el color base (`COLOR_0` en el glTF).           |
+| `maskAttribute`  | `_MASK`     | Atributo con la máscara de uniforme.                         |
+| `maskValue`      | `0`         | Máscara a usar si el modelo no trae el atributo.             |
+| `baseColor`      | `#ffffff`   | Color plano si el modelo no trae color por vértice.          |
+| `maskChannel`    | `none`      | Canal del atlas con la máscara: `none`, `r`, `g`, `b` o `a`. |
+
+3. Abrí `/debug/models`: lista cada tipo con su estado, sus triángulos contra el
+   presupuesto y el alto real de la geometría en uso. Ahí se ve el teñido por
+   jugador y el giro del modelo.
+4. Registrá la licencia de lo que hayas usado en `docs/CREDITS.md`.
+
+Un tipo que no esté en el manifiesto, o cuyo archivo falle, sigue con su
+primitiva: no hay forma de romper el juego desde acá.

@@ -10,6 +10,7 @@ function debugRoutes(): Plugin {
     if (url === undefined) return url;
     if (url === '/debug/combat' || url === '/debug/combat/') return '/debug/combat.html';
     if (url === '/debug/sounds' || url === '/debug/sounds/') return '/debug/sounds.html';
+    if (url === '/debug/models' || url === '/debug/models/') return '/debug/models.html';
     return url;
   };
 
@@ -52,6 +53,7 @@ export default defineConfig({
         main: 'index.html',
         combat: 'debug/combat.html',
         sounds: 'debug/sounds.html',
+        models: 'debug/models.html',
       },
     },
   },

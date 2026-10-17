@@ -13,6 +13,8 @@
  *   - el sandbox `/debug/combat` tambien carga sin errores
  *   - el sandbox `/debug/sounds` lista los slots del manifiesto y todos
  *     figuran sin archivo (el juego viaja en silencio, ADR 0011)
+ *   - el sandbox `/debug/models` lista los cuatro tipos de unidad y todos
+ *     figuran sin modelo (el juego viaja con primitivas, ADR 0012)
  *
  * Deja capturas en `test-results/`.
  *
@@ -69,10 +71,14 @@ const SLOTS_SONIDO: readonly string[] = [
   'battle.ambience.high',
 ];
 
+/** Los cuatro tipos de unidad que pueden tener modelo propio (ADR 0012). */
+const TIPOS_MODELO: readonly string[] = ['infantry', 'cavalry', 'artillery', 'ship'];
+
 /** Reescribe las rutas de depuracion sin `.html`, igual que el dev server. */
 function rewriteDebugRoute(url: string): string {
   if (url === '/debug/combat' || url === '/debug/combat/') return '/debug/combat.html';
   if (url === '/debug/sounds' || url === '/debug/sounds/') return '/debug/sounds.html';
+  if (url === '/debug/models' || url === '/debug/models/') return '/debug/models.html';
   return url;
 }
 
@@ -129,10 +135,21 @@ async function main(): Promise<void> {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() !== 'error') return;
+    const ubicacion = message.location().url;
+    consoleErrors.push(ubicacion === '' ? message.text() : `${message.text()} <${ubicacion}>`);
   });
   page.on('pageerror', (error) => consoleErrors.push(`pageerror: ${error.message}`));
+  page.on('response', (response) => {
+    // Los 404 esperados (los archivos que el usuario todavia no aporto) no
+    // cuentan: el juego tiene que funcionar sin ellos.
+    if (response.status() < 400) return;
+    const url = response.url();
+    if (url.includes('/audio/combat/') || url.includes('/models/combat/')) return;
+    failedRequests.push(`${response.status()} ${url}`);
+  });
 
   await page.goto(url, { waitUntil: 'networkidle' });
 
@@ -261,14 +278,49 @@ async function main(): Promise<void> {
   }
   await page.screenshot({ path: join(OUTPUT_DIR, 'smoke-sonidos.png') });
 
+  // Sandbox de modelos: lista los cuatro tipos y, como el manifiesto viaja sin
+  // modelos (ADR 0012), todos tienen que figurar sin modelo: el juego usa las
+  // primitivas y su presupuesto de triangulos.
+  await page.goto(`${url}debug/models`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const modelosText = (await hud.innerText().catch(() => '')) || '';
+  const faltanTipos = TIPOS_MODELO.filter((tipo) => !modelosText.includes(tipo));
+  if (faltanTipos.length > 0) {
+    failures.push({
+      check: 'modelos',
+      detail: `faltan tipos en la pagina: ${faltanTipos.join(', ')}`,
+    });
+  }
+  const sinModelo = await page.evaluate(
+    () =>
+      Array.from(document.querySelectorAll('#hud span')).filter(
+        (span) => span.textContent === 'Sin modelo' || span.textContent === 'No model',
+      ).length,
+  );
+  if (sinModelo !== TIPOS_MODELO.length) {
+    failures.push({
+      check: 'modelos',
+      detail: `${sinModelo} de ${TIPOS_MODELO.length} tipos figuran sin modelo`,
+    });
+  }
+  await page.screenshot({ path: join(OUTPUT_DIR, 'smoke-modelos.png') });
+
   if (consoleErrors.length > 0) {
     failures.push({ check: 'consola', detail: consoleErrors.slice(0, 5).join(' | ') });
+  }
+  if (failedRequests.length > 0) {
+    failures.push({ check: 'recursos', detail: failedRequests.slice(0, 5).join(' | ') });
   }
 
   await browser.close();
   await close();
 
-  for (const name of ['smoke-tablero.png', 'smoke-combate.png', 'smoke-sonidos.png']) {
+  for (const name of [
+    'smoke-tablero.png',
+    'smoke-combate.png',
+    'smoke-sonidos.png',
+    'smoke-modelos.png',
+  ]) {
     const path = join(OUTPUT_DIR, name);
     if (existsSync(path)) {
       const size = (await readFile(path)).byteLength;
