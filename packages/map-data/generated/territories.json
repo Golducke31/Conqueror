@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-16T09:05:39.035Z",
+  "generatedAt": "2026-10-17T07:20:47.125Z",
   "generator": "scripts/build-map.ts",
   "dataset": "Natural Earth 50m admin_0 + admin_1 (dominio publico)",
   "projectionNote": "Coordenadas geograficas [lon, lat] en EPSG:4326. La proyeccion a pantalla la resuelve el cliente con d3-geo (geoNaturalEarth1).",

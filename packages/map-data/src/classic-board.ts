@@ -22,7 +22,7 @@
  * matriz. Asi el tablero renderizado y el grafo de reglas no pueden divergir.
  */
 
-import type { TerritoryId } from '@conqueror/shared';
+import type { ContinentId, TerritoryId } from '@conqueror/shared';
 
 /** Vecinos declarados por territorio. El build simetriza y normaliza. */
 export const CLASSIC_BOARD_NEIGHBORS: Readonly<Record<TerritoryId, readonly TerritoryId[]>> = {
@@ -99,8 +99,90 @@ export const CONTINENT_ORDER = [
   'oceania',
 ] as const;
 
+/**
+ * Continente de cada territorio.
+ *
+ * Es la misma agrupacion que `territories.config.json` (la fuente del mapa) y
+ * los tests lo verifican: si alguien mueve un territorio de continente en un
+ * lado y no en el otro, falla. El motor de reglas lo necesita para los bonos de
+ * continente y para las misiones secretas, sin cargar los datos generados.
+ */
+export const CLASSIC_BOARD_CONTINENTS: Readonly<Record<TerritoryId, ContinentId>> = {
+  // ---- America del Sur ----
+  argentina: 'america_del_sur',
+  brasil: 'america_del_sur',
+  chile: 'america_del_sur',
+  colombia: 'america_del_sur',
+  peru: 'america_del_sur',
+  uruguay: 'america_del_sur',
+
+  // ---- America del Norte ----
+  alaska: 'america_del_norte',
+  canada: 'america_del_norte',
+  california: 'america_del_norte',
+  groenlandia: 'america_del_norte',
+  labrador: 'america_del_norte',
+  mexico: 'america_del_norte',
+  nueva_york: 'america_del_norte',
+  oregon: 'america_del_norte',
+  terranova: 'america_del_norte',
+  yukon: 'america_del_norte',
+
+  // ---- Europa ----
+  alemania: 'europa',
+  espana: 'europa',
+  francia: 'europa',
+  gran_bretana: 'europa',
+  islandia: 'europa',
+  italia: 'europa',
+  polonia: 'europa',
+  rusia: 'europa',
+  suecia: 'europa',
+
+  // ---- Asia ----
+  arabia: 'asia',
+  aral: 'asia',
+  china: 'asia',
+  gobi: 'asia',
+  india: 'asia',
+  iran: 'asia',
+  israel: 'asia',
+  japon: 'asia',
+  kamchatka: 'asia',
+  malasia: 'asia',
+  mongolia: 'asia',
+  siberia: 'asia',
+  taimir: 'asia',
+  tartaria: 'asia',
+  turquia: 'asia',
+
+  // ---- Africa ----
+  egipto: 'africa',
+  etiopia: 'africa',
+  madagascar: 'africa',
+  sahara: 'africa',
+  sudafrica: 'africa',
+  zaire: 'africa',
+
+  // ---- Oceania ----
+  australia: 'oceania',
+  borneo: 'oceania',
+  java: 'oceania',
+  sumatra: 'oceania',
+};
+
 /** Ids de los 50 territorios, en orden de tablero. */
 export const TERRITORY_IDS: readonly TerritoryId[] = Object.keys(CLASSIC_BOARD_NEIGHBORS);
+
+/** Territorios de cada continente, derivados de `CLASSIC_BOARD_CONTINENTS`. */
+export const CLASSIC_BOARD_TERRITORIES_BY_CONTINENT: Readonly<
+  Record<ContinentId, readonly TerritoryId[]>
+> = Object.fromEntries(
+  CONTINENT_ORDER.map((continent) => [
+    continent,
+    TERRITORY_IDS.filter((territory) => CLASSIC_BOARD_CONTINENTS[territory] === continent),
+  ]),
+);
 
 /** Normaliza un par como `[menor, mayor]`. */
 export function normalizePair(a: TerritoryId, b: TerritoryId): readonly [string, string] {

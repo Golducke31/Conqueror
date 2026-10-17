@@ -6,9 +6,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_RULES_CONFIG } from '@conqueror/shared';
 import { loadMapConfig, parseMapConfig } from './load-config.js';
 import {
+  CLASSIC_BOARD_CONTINENTS,
   CLASSIC_BOARD_NEIGHBORS,
+  CLASSIC_BOARD_TERRITORIES_BY_CONTINENT,
   CONTINENT_ORDER,
   TERRITORY_IDS,
   classicBoardEdges,
@@ -186,5 +189,39 @@ describe('validacion de la config', () => {
     expect(first).toBeDefined();
     if (first !== undefined) delete first.names.en;
     expect(() => parseMapConfig(base)).toThrow();
+  });
+});
+
+describe('continentes del tablero clasico', () => {
+  it('cada territorio del config tiene su continente en la matriz', () => {
+    for (const territory of config.territories) {
+      expect(
+        CLASSIC_BOARD_CONTINENTS[territory.id],
+        `${territory.id} falta en CLASSIC_BOARD_CONTINENTS`,
+      ).toBe(territory.continent);
+    }
+  });
+
+  it('la matriz no declara continentes de territorios que no existen', () => {
+    expect(Object.keys(CLASSIC_BOARD_CONTINENTS).sort()).toEqual([...TERRITORY_IDS].sort());
+  });
+
+  it('los territorios por continente cubren el tablero sin repetir', () => {
+    const vistos = new Set<string>();
+    for (const continent of CONTINENT_ORDER) {
+      const territorios = CLASSIC_BOARD_TERRITORIES_BY_CONTINENT[continent] ?? [];
+      expect(territorios.length, `${continent} sin territorios`).toBeGreaterThan(0);
+      for (const territorio of territorios) {
+        expect(vistos.has(territorio), `${territorio} en dos continentes`).toBe(false);
+        vistos.add(territorio);
+      }
+    }
+    expect(vistos.size).toBe(TERRITORY_IDS.length);
+  });
+
+  it('los bonos por defecto cubren los seis continentes', () => {
+    for (const continent of CONTINENT_ORDER) {
+      expect(DEFAULT_RULES_CONFIG.continentBonuses[continent]).toBeGreaterThan(0);
+    }
   });
 });

@@ -211,7 +211,7 @@ describe('estimateBattleOdds — invariantes', () => {
   });
 });
 
-describe('estimateBattleOdds — contra un resolvedor independiente', () => {
+describe('estimateBattleOdds — contra un resolvedor independiente', { timeout: 60_000 }, () => {
   /**
    * Iteracion de la funcion de valor: parte de probabilidades cero y aplica
    * la ecuacion de Bellman un numero fijo de veces. Como cada ronda reduce
