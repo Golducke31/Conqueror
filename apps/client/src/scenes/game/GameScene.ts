@@ -28,7 +28,7 @@ import gsap from 'gsap';
 import type { TerritoryId } from '@conqueror/shared';
 import type { RulesConfig } from '@conqueror/shared';
 import { estimateBattleOdds } from '@conqueror/rules';
-import type { MockGameState } from '../../app/fixtures.js';
+import type { PlayerColorId } from '@conqueror/shared';
 import {
   BORDER_COLOR,
   HOVER_COLOR,
@@ -52,6 +52,27 @@ import { TerritoryPicker } from '../../map/picking.js';
 
 /** Distancia de referencia para el tamaño en pantalla de los numeros. */
 const LABEL_REFERENCE_DISTANCE = 620;
+
+/**
+ * Vista de tablero: lo que la escena necesita saber de la partida.
+ *
+ * La cumplen tanto los datos de prueba (`app/fixtures.ts`) como la vista
+ * publica del motor (`PublicGameState` de `@conqueror/rules`): la escena
+ * dibuja, no conoce las reglas.
+ */
+export interface BoardPlayerView {
+  readonly id: string;
+  readonly name: string;
+  readonly color: PlayerColorId;
+}
+
+export interface BoardView {
+  readonly players: readonly BoardPlayerView[];
+  readonly activePlayer: string;
+  readonly territories: Readonly<
+    Record<TerritoryId, { readonly owner: string | null; readonly armies: number }>
+  >;
+}
 
 export interface GameSceneOptions {
   readonly renderer: RendererHandle;
@@ -89,7 +110,7 @@ export interface GameScene {
    * fichas siguen con las primitivas (ADR 0012).
    */
   readonly models: UnitModels;
-  setGameState(state: MockGameState): void;
+  setGameState(state: BoardView): void;
   selected(): TerritoryId | null;
   hovered(): TerritoryId | null;
   onSelect(callback: (territory: TerritoryId | null) => void): void;
@@ -149,7 +170,7 @@ export interface GameScene {
 export async function createGameScene(options: GameSceneOptions): Promise<GameScene> {
   const data = await loadMapData();
 
-  let gameState: MockGameState | null = null;
+  let gameState: BoardView | null = null;
 
   const colorFor = (territory: TerritoryId): Color | null => {
     const owner = gameState?.territories[territory]?.owner ?? null;
@@ -480,7 +501,7 @@ export async function createGameScene(options: GameSceneOptions): Promise<GameSc
     rig,
     group,
 
-    setGameState(state: MockGameState): void {
+    setGameState(state: BoardView): void {
       gameState = state;
 
       // Se reescriben los colores por dueno en la malla fusionada.

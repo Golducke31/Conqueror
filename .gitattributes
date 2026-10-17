@@ -1,0 +1,4 @@
+# Fin de linea: siempre LF, en todos los sistemas.
+# Evita que Windows (core.autocrlf) convierta los archivos a CRLF y rompa
+# `pnpm format:check` (Prettier usa endOfLine: lf).
+* text=auto eol=lf

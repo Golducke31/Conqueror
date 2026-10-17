@@ -1,5 +1,87 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
+
+/**
+ * Artefactos del tablero que genera `pnpm map:build`, servidos bajo `/map/`.
+ * Los nombres son los de `@conqueror/map-data`
+ * (TERRITORIES_TOPOLOGY_FILE, TERRITORIES_INDEX_FILE, ADJACENCY_FILE,
+ * FRONTS_FILE): se repiten aca porque el config corre en Node puro y no puede
+ * importar el paquete, que es TypeScript.
+ */
+const MAP_FILES: readonly string[] = [
+  'territories.topojson.json',
+  'territories.json',
+  'adjacency.json',
+  'fronts.json',
+];
+
+/** Carpeta donde `map:build` deja los artefactos. */
+const MAP_GENERATED = resolve(import.meta.dirname, '../../packages/map-data/generated');
+
+/**
+ * Sirve los artefactos del tablero bajo `/map/`, sin duplicarlos en el repo:
+ * en dev y preview se leen de `packages/map-data/generated`, y en el build se
+ * emiten como assets de `dist/map/`.
+ *
+ * Antes vivian (mal) en `public/`, que nadie poblaba: el juego cargaba con 404.
+ * Ver docs/adr/0004-datos-de-mapa-natural-earth.md.
+ */
+function mapAssets(): Plugin {
+  return {
+    name: 'conqueror-map-assets',
+    configureServer(server) {
+      server.middlewares.use('/map', (request, response, next) => {
+        const file = (request.url ?? '').split('?')[0]?.replace(/^\/+/, '') ?? '';
+        if (!MAP_FILES.includes(file)) {
+          next();
+          return;
+        }
+        try {
+          const content = readFileSync(resolve(MAP_GENERATED, file));
+          response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+          response.end(content);
+        } catch {
+          next();
+        }
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use('/map', (request, response, next) => {
+        const file = (request.url ?? '').split('?')[0]?.replace(/^\/+/, '') ?? '';
+        if (!MAP_FILES.includes(file)) {
+          next();
+          return;
+        }
+        try {
+          const content = readFileSync(resolve(MAP_GENERATED, file));
+          response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+          response.end(content);
+        } catch {
+          next();
+        }
+      });
+    },
+    generateBundle() {
+      for (const file of MAP_FILES) {
+        let source: Buffer;
+        try {
+          source = readFileSync(resolve(MAP_GENERATED, file));
+        } catch {
+          this.error(`falta el artefacto del mapa ${file}: corre \`pnpm map:build\``);
+          return;
+        }
+        this.emitFile({
+          type: 'asset',
+          fileName: `map/${file}`,
+          source,
+        });
+      }
+    },
+  };
+}
 
 /**
  * Permite entrar al sandbox con `/debug/combat` (sin `.html`), como pide el
@@ -34,7 +116,7 @@ function debugRoutes(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [tailwindcss(), debugRoutes()],
+  plugins: [tailwindcss(), mapAssets(), debugRoutes()],
   server: {
     port: 5173,
     host: '127.0.0.1',

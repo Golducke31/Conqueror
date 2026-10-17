@@ -177,6 +177,8 @@ export function publicState(state: GameState, viewerId: PlayerId): PublicGameSta
     ownMission: propio?.mission ?? null,
     conquered: state.conqueredTerritories,
     pendingConquest: state.pendingConquest,
+    placementAllowance: state.placementRoundAllowance,
+    armiesToPlace: state.armiesToPlace,
     winner: state.winner,
   };
 }

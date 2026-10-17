@@ -10,7 +10,9 @@ data/ne/
 # vista previa (pesada y regenerable con `pnpm map:preview`).
 packages/map-data/generated/map-preview.*
 
-# Copia servida al cliente: la regenera `pnpm map:build`.
+# Copia servida al cliente: hoy la sirve el plugin `mapAssets` de
+# apps/client/vite.config.ts directo desde packages/map-data/generated. Si
+# algun dia se vuelva a copiar aca, regenerarla con `pnpm map:build`.
 apps/client/public/map/
 
 # Entorno y sistema

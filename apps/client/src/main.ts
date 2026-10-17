@@ -1,24 +1,32 @@
 /**
- * Arranque del cliente.
+ * Arranque del cliente (Hito 4).
  *
- * Hito 2: tablero interactivo con geometria real, fichas instanciadas y datos de
- * prueba. El motor de reglas llega en el Hito 3 y el combate visual se enchufa
- * desde `render/combat/`.
+ * Tres modos:
+ *   - `?explorar=1`  tablero con datos de prueba, sin reglas (herramienta de
+ *                    desarrollo, la del Hito 2).
+ *   - `?auto=1`      arranca directo una partida local (por defecto, de bots):
+ *                    la usan el smoke e2e y las pruebas manuales del flujo.
+ *   - por defecto    pantalla de configuracion de partida local.
+ *
+ * El Hito 2 dejo el tablero andando; el motor de reglas llego en el Hito 3 y
+ * aca se enchufa a la partida jugable (Hito 4).
  */
 
 import './styles/main.css';
 
 import type { TerritoryId } from '@conqueror/shared';
-import { DEFAULT_RULES_CONFIG } from '@conqueror/shared';
-import { LOCALE_CHANGE_EVENT, detectLocale, getLocale, setLocale, t } from './app/i18n';
+import { DEFAULT_RULES_CONFIG, PLAYER_COLOR_ORDER, type PlayerColorId } from '@conqueror/shared';
+import { LOCALE_CHANGE_EVENT, detectLocale, getLocale, setLocale, t } from './app/i18n.js';
 import { createMockGameState, type MockGameState } from './app/fixtures.js';
 import { playerColor } from './app/palette.js';
-import { createRenderer, type RendererHandle } from './render/renderer';
-import { createGameScene, type AttackOddsInfo, type GameScene } from './scenes/game/GameScene';
+import { createRenderer, type RendererHandle } from './render/renderer.js';
+import { createGameScene, type AttackOddsInfo, type GameScene } from './scenes/game/GameScene.js';
+import { startMatch } from './scenes/game/matchApp.js';
+import { renderSetup, type LocalGameSetup } from './ui/setup.js';
 
 const params = new URLSearchParams(window.location.search);
 const debugActivo = params.get('debug') === '1' || params.get('debug') === 'combat';
-const jugadoresIniciales = Math.max(2, Math.min(6, Number(params.get('jugadores') ?? '4')));
+const modoExplorar = params.get('explorar') === '1';
 
 function nodo(etiqueta: string, clase: string, texto?: string): HTMLElement {
   const element = document.createElement(etiqueta);
@@ -30,6 +38,44 @@ function nodo(etiqueta: string, clase: string, texto?: string): HTMLElement {
 function esTactil(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
+
+/** Limita un entero al rango; si no es numero, devuelve el por defecto. */
+function limitar(valor: number, minimo: number, maximo: number, porDefecto: number): number {
+  if (!Number.isFinite(valor)) return porDefecto;
+  return Math.min(maximo, Math.max(minimo, Math.round(valor)));
+}
+
+/**
+ * Partida automatica (smoke e2e y pruebas de flujo): jugadores bots salvo los
+ * primeros `humanos`, semilla fija por defecto para resultados reproducibles.
+ */
+function setupAutomatica(): LocalGameSetup {
+  const config = DEFAULT_RULES_CONFIG;
+  const total = limitar(Number(params.get('jugadores')), config.players.min, config.players.max, 3);
+  const humanos = limitar(Number(params.get('humanos')), 0, total, 0);
+  const semilla = limitar(Number(params.get('semilla')), 1, 9_999_999, 20261017);
+
+  const players = Array.from({ length: total }, (_, indice) => {
+    const bot = indice >= humanos;
+    return {
+      id: `p${indice + 1}`,
+      name: bot ? `Bot ${indice + 1}` : `Jugador ${indice + 1}`,
+      color: (PLAYER_COLOR_ORDER[indice] ?? 'rojo') as PlayerColorId,
+      bot,
+    };
+  });
+
+  return {
+    players,
+    seed: semilla,
+    config,
+    botPlayers: players.filter((player) => player.bot).map((player) => player.id),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Modo exploracion (tablero con datos de prueba, del Hito 2)
+// -----------------------------------------------------------------------------
 
 interface AppState {
   scene: GameScene | null;
@@ -288,14 +334,8 @@ function montarDepuracion(handle: RendererHandle, scene: GameScene): void {
   }, 500);
 }
 
-async function arrancar(): Promise<void> {
-  setLocale(detectLocale());
-
-  const hud = document.getElementById('hud');
-  const canvas = document.getElementById('lienzo');
-  if (hud === null || !(canvas instanceof HTMLCanvasElement)) {
-    throw new Error('Falta el HUD o el lienzo en index.html');
-  }
+async function arrancarExploracion(canvas: HTMLCanvasElement): Promise<void> {
+  const jugadoresIniciales = Math.max(2, Math.min(6, Number(params.get('jugadores') ?? '4')));
 
   pintar();
 
@@ -361,8 +401,87 @@ async function arrancar(): Promise<void> {
   document.addEventListener(LOCALE_CHANGE_EVENT, pintar);
 }
 
+// -----------------------------------------------------------------------------
+// Modo partida local
+// -----------------------------------------------------------------------------
+
+async function arrancarPartida(
+  setup: LocalGameSetup,
+  canvas: HTMLCanvasElement,
+  hud: HTMLElement,
+): Promise<void> {
+  // Contenedor del cartel de relevo (hot-seat), por encima de todo.
+  const relevo = nodo('div', 'hidden');
+  relevo.id = 'relevo';
+  document.body.append(relevo);
+
+  try {
+    const partida = await startMatch({
+      setup,
+      canvas,
+      hud,
+      relevo,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      botDelayMs: limitar(Number(params.get('delay')), 0, 5000, 700),
+      ...(debugActivo ? { debug: true } : {}),
+      onExit: () => {
+        // Se libera la partida completa (worker, render, escenas) antes de
+        // volver a la configuracion: si no, la anterior sigue corriendo.
+        partida.dispose();
+        relevo.remove();
+        hud.replaceChildren();
+        renderSetup(hud, {
+          config: DEFAULT_RULES_CONFIG,
+          onStart: (nuevo) => void arrancarPartida(nuevo, canvas, hud),
+        });
+      },
+    });
+  } catch (error) {
+    hud.replaceChildren();
+    const caja = nodo(
+      'section',
+      'pointer-events-auto mx-auto mt-16 w-full max-w-lg rounded-xl border border-grana/70 bg-lana/90 p-6',
+    );
+    caja.setAttribute('role', 'alert');
+    caja.append(
+      nodo('h2', 'font-display text-lg text-grana', t('error.mapa')),
+      nodo(
+        'p',
+        'mt-2 text-sm text-algodon/70',
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+    hud.append(caja);
+  }
+}
+
+async function main(): Promise<void> {
+  setLocale(detectLocale());
+
+  const hud = document.getElementById('hud');
+  const canvas = document.getElementById('lienzo');
+  if (hud === null || !(canvas instanceof HTMLCanvasElement)) {
+    throw new Error('Falta el HUD o el lienzo en index.html');
+  }
+
+  if (modoExplorar) {
+    await arrancarExploracion(canvas);
+    return;
+  }
+
+  if (params.get('auto') === '1') {
+    await arrancarPartida(setupAutomatica(), canvas, hud);
+    return;
+  }
+
+  renderSetup(hud, {
+    config: DEFAULT_RULES_CONFIG,
+    onStart: (setup) => arrancarPartida(setup, canvas, hud),
+  });
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => void arrancar(), { once: true });
+  document.addEventListener('DOMContentLoaded', () => void main(), { once: true });
 } else {
-  void arrancar();
+  void main();
 }

@@ -27,7 +27,8 @@
     "map:balance": "tsx scripts/balance-report.ts",
     "map:all": "pnpm map:build && pnpm map:validate && pnpm map:balance",
     "map:preview": "tsx scripts/preview-map.ts",
-    "smoke": "tsx scripts/smoke-client.ts"
+    "smoke": "tsx scripts/smoke-client.ts",
+    "smoke:match": "tsx scripts/smoke-match.ts"
   },
   "devDependencies": {
     "@conqueror/map-data": "workspace:*",

@@ -20,6 +20,7 @@ export * from './combat.js';
 export * from './state.js';
 export * from './apply.js';
 export * from './legal.js';
+export * from './bots.js';
 
 // Modulos que ya existian y no son parte del motor de reglas.
 export * from './battle-odds.js';

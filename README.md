@@ -4,11 +4,12 @@ Juego de conquista mundial por turnos para **2 a 6 jugadores**, con tablero 3D
 sobre el **mapa real del mundo**, modo **local (hot-seat)** y modo **online**
 (servidor autoritativo).
 
-Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 3 cerrados**
-(base del proyecto, datos del mapa, tablero 3D interactivo y motor de reglas
-puro y determinista) y **Hitos C0 a C6 del plan de combate cerrados** (sandbox
-de combate, fichas y composicion, coreografia de ronda, conquista y cruce
-maritimo, mapa vivo, audio y arte final).
+Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 4 cerrados**
+(base del proyecto, datos del mapa, tablero 3D interactivo, motor de reglas
+puro y determinista, y modo local jugable de punta a punta) y **Hitos C0 a C6
+del plan de combate cerrados** (sandbox de combate, fichas y composicion,
+coreografia de ronda, conquista y cruce maritimo, mapa vivo, audio y arte
+final).
 
 ## Requisitos
 
@@ -30,35 +31,38 @@ Para ver el mapa generado sin abrir el juego:
 pnpm map:preview      # escribe packages/map-data/generated/map-preview.svg
 ```
 
-### Pantallas de desarrollo
+### Pantallas
 
-| Ruta            | Que es                                                                         |
-| --------------- | ------------------------------------------------------------------------------ |
-| `/`             | Tablero interactivo con datos de prueba. `?jugadores=2..6` cambia la cantidad. |
-| `/?debug=1`     | Lo mismo, con el overlay de FPS, draw calls y unidades visibles.               |
-| `/debug/combat` | Sandbox de combate: dispara rondas entre dos territorios vecinos.              |
-| `/debug/sounds` | Prueba de sonidos: un botón por slot del manifiesto.                           |
-| `/debug/models` | Prueba de modelos: los cuatro tipos, en los cuatro colores de jugador.         |
+| Ruta                   | Que es                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `/`                    | Pantalla de configuración y partida local (2–6 jugadores, bots opcionales, hot-seat).                        |
+| `/?auto=1`             | Arranca directo una partida local. `&jugadores=3&humanos=1&delay=0&semilla=N` la configuran (bots y humano). |
+| `/?explorar=1`         | Tablero con datos de prueba, sin reglas (herramienta del Hito 2). `?jugadores=2..6` cambia la cantidad.      |
+| `/?explorar=1&debug=1` | Lo mismo, con el overlay de FPS, draw calls y unidades visibles.                                             |
+| `/debug/combat`        | Sandbox de combate: dispara rondas entre dos territorios vecinos.                                            |
+| `/debug/sounds`        | Prueba de sonidos: un botón por slot del manifiesto.                                                         |
+| `/debug/models`        | Prueba de modelos: los cuatro tipos, en los cuatro colores de jugador.                                       |
 
 ## Comandos
 
-| Comando                             | Que hace                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| `pnpm dev`                          | Cliente en modo desarrollo (Vite).                                         |
-| `pnpm dev:server`                   | Servidor minimo con `/health` (Colyseus llega en el Hito 6).               |
-| `pnpm build`                        | Build de produccion del cliente (tablero + sandbox).                       |
-| `pnpm typecheck`                    | Chequeo de tipos de todos los paquetes y de `scripts/`.                    |
-| `pnpm lint` / `pnpm lint:fix`       | ESLint.                                                                    |
-| `pnpm format` / `pnpm format:check` | Prettier.                                                                  |
-| `pnpm test`                         | Tests unitarios (Vitest).                                                  |
-| `pnpm smoke`                        | Smoke test del cliente con Chromium. Requiere `pnpm build`.                |
-| `pnpm map:fetch`                    | Descarga Natural Earth 50m a `data/ne/`.                                   |
-| `pnpm map:build`                    | Genera `territories.json`, `adjacency.json`, `fronts.json` y el TopoJSON.  |
-| `pnpm map:build --suggest`          | Igual, pero en vez de fallar imprime las entradas para pegar en la config. |
-| `pnpm map:validate`                 | Valida el tablero generado. Falla el build si algo no cierra.              |
-| `pnpm map:balance`                  | Informe de balance por continente y propuesta de bonos.                    |
-| `pnpm map:all`                      | `map:build` + `map:validate` + `map:balance`.                              |
-| `pnpm map:preview`                  | Vista previa del tablero en SVG.                                           |
+| Comando                             | Que hace                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm dev`                          | Cliente en modo desarrollo (Vite).                                                  |
+| `pnpm dev:server`                   | Servidor minimo con `/health` (Colyseus llega en el Hito 6).                        |
+| `pnpm build`                        | Build de produccion del cliente (tablero + sandbox).                                |
+| `pnpm typecheck`                    | Chequeo de tipos de todos los paquetes y de `scripts/`.                             |
+| `pnpm lint` / `pnpm lint:fix`       | ESLint.                                                                             |
+| `pnpm format` / `pnpm format:check` | Prettier.                                                                           |
+| `pnpm test`                         | Tests unitarios (Vitest).                                                           |
+| `pnpm smoke`                        | Smoke test del cliente con Chromium (pantallas y sandboxes). Requiere `pnpm build`. |
+| `pnpm smoke:match`                  | Smoke test de la partida local (turno humano, relevo, 3 bots de inicio a fin).      |
+| `pnpm map:fetch`                    | Descarga Natural Earth 50m a `data/ne/`.                                            |
+| `pnpm map:build`                    | Genera `territories.json`, `adjacency.json`, `fronts.json` y el TopoJSON.           |
+| `pnpm map:build --suggest`          | Igual, pero en vez de fallar imprime las entradas para pegar en la config.          |
+| `pnpm map:validate`                 | Valida el tablero generado. Falla el build si algo no cierra.                       |
+| `pnpm map:balance`                  | Informe de balance por continente y propuesta de bonos.                             |
+| `pnpm map:all`                      | `map:build` + `map:validate` + `map:balance`.                                       |
+| `pnpm map:preview`                  | Vista previa del tablero en SVG.                                                    |
 
 ## Estructura
 
@@ -68,12 +72,14 @@ apps/
     debug/           paginas de desarrollo (sandbox de combate)
     src/app/         bootstrap, i18n, paleta, datos de prueba
     src/map/         proyeccion, geometria del tablero, picking, camara
+    src/net/         GameTransport, LocalTransport (motor en Web Worker)
     src/render/      renderer bajo demanda, materiales, unidades, combate
-    src/scenes/      escena del tablero
+    src/scenes/      escena del tablero y orquestador de la partida local
+    src/ui/          HUD de partida, pantalla de configuración, relevo (hot-seat)
   server/            servidor HTTP minimo (Colyseus en el Hito 6)
 packages/
   shared/            identificadores, tipos y RulesConfig
-  rules/             motor de reglas puro + composeSquad
+  rules/             motor de reglas puro + bots + composeSquad
   map-data/          config del tablero, matriz clasica y artefactos generados
 scripts/             fetch-map-data, build-map, validate-map, balance-report, preview, smoke
 docs/adr/            decisiones de arquitectura
@@ -125,6 +131,27 @@ Regla de dependencias: `rules` no importa `three`, DOM, Colyseus ni Node.
   independiente y una simulacion de 1000 partidas con bot legal-aleatorio que
   demuestra que el motor no tiene callejones sin salida.
 - Ver `docs/adr/0003-motor-de-reglas-puro-y-determinista.md`.
+
+## Modo local (Hito 4)
+
+- `LocalTransport` corre el motor en un **Web Worker** (con caída al hilo
+  principal si no hay `Worker`): el HUD y el render nunca compiten con la lógica.
+- La UI habla solo con `GameTransport`: el modo online (Hito 6) agrega
+  `ColyseusTransport` contra la misma interfaz, sin tocar el HUD.
+- **Hot-seat:** 2–6 jugadores en el mismo dispositivo con pantalla de relevo
+  entre turnos (oculta tarjetas y misión). El estado público se filtra por el
+  jugador de turno.
+- **Bots nivel 1** (`packages/rules/src/bots.ts`): siempre comandos legales,
+  con criterio para que la partida avance (refuerzan el frente, atacan solo con
+  ventaja de dados, consolidan conquistas). Jugables desde la pantalla de
+  configuración (“Todos bots”) y reutilizables como reemplazo de AFK en online.
+  No garantizan terminar todas las partidas —son nivel 1—; el nivel 2
+  heurístico llega en el Hito 7.
+- El estado del motor se aplica al tablero con la coreografía existente: la
+  animación nunca decide ni bloquea (se salta con clic, Espacio o Esc).
+- Verificado por dos smokes: una partida local de 3 bots se juega de inicio a
+  fin (`pnpm smoke:match`) y las pantallas y sandboxes cargan sin errores
+  (`pnpm smoke`).
 
 ## Idiomas
 

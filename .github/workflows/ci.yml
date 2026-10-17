@@ -52,3 +52,10 @@ jobs:
 
       - name: Build del cliente
         run: pnpm build
+
+      - name: Smoke de pantallas
+        run: pnpm smoke
+
+      - name: Smoke de partida local
+        run: pnpm smoke:match
+        timeout-minutes: 10

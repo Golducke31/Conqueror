@@ -277,5 +277,13 @@ export interface PublicGameState {
     readonly min: number;
     readonly max: number;
   } | null;
+  /**
+   * Tope de ejercitos por ronda del despliegue inicial (null fuera de esa
+   * fase). Lo necesita la UI para no ofrecer colocar mas de lo que la ronda
+   * permite.
+   */
+  readonly placementAllowance: number | null;
+  /** Ejercitos que faltan colocarle al jugador de turno. */
+  readonly armiesToPlace: number;
   readonly winner: string | null;
 }

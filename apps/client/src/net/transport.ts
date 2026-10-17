@@ -5,40 +5,21 @@
  * o en un servidor. Eso permite que el modo hot-seat y el modo online compartan
  * HUD, animaciones y validacion de la UI.
  *
+ * `PublicGameState`, `PublicPlayer` y `PublicTerritory` vienen de
+ * `@conqueror/rules`: son la vista publica que define el motor, y el estado que
+ * el servidor difundiria en el modo online (Hito 6). El transporte local la
+ * produce con la misma funcion (`publicState`), asi que no hay dos definiciones
+ * de lo mismo.
+ *
  * Ver docs/adr/0003-motor-de-reglas-puro-y-determinista.md
  */
 
-import type { Command, GameEvent, Phase } from '@conqueror/rules';
-import type { PlayerColorId, TerritoryId } from '@conqueror/shared';
+import type { Command, GameEvent, PublicGameState } from '@conqueror/rules';
+
+export type { PublicGameState, PublicPlayer, PublicTerritory } from '@conqueror/rules';
 
 /** Cancela una suscripcion. */
 export type Unsub = () => void;
-
-/** Vista publica del estado: nunca incluye tarjetas ni misiones ajenas. */
-export interface PublicGameState {
-  readonly phase: Phase;
-  readonly activePlayer: string;
-  readonly turn: number;
-  readonly players: readonly PublicPlayer[];
-  readonly territories: Readonly<Record<TerritoryId, PublicTerritory>>;
-  /** Solo las tarjetas del jugador que mira. Vacio en modo online ajeno. */
-  readonly ownCards: readonly string[];
-}
-
-export interface PublicPlayer {
-  readonly id: string;
-  readonly name: string;
-  readonly color: PlayerColorId;
-  readonly territories: number;
-  readonly armies: number;
-  readonly cardCount: number;
-  readonly eliminated: boolean;
-}
-
-export interface PublicTerritory {
-  readonly owner: string | null;
-  readonly armies: number;
-}
 
 export interface GameTransport {
   /** Envia un comando. Resuelve cuando el comando fue aceptado. */
