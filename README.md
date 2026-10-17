@@ -4,10 +4,11 @@ Juego de conquista mundial por turnos para **2 a 6 jugadores**, con tablero 3D
 sobre el **mapa real del mundo**, modo **local (hot-seat)** y modo **online**
 (servidor autoritativo).
 
-Proyecto en construccion por hitos. Estado actual: **Hitos 0, 1 y 2 cerrados**
-(base del proyecto, datos del mapa y tablero interactivo con fichas) y
-**Hitos C0 y C1 del plan de combate** (sandbox, director y despliegue de
-escuadras).
+Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 3 cerrados**
+(base del proyecto, datos del mapa, tablero 3D interactivo y motor de reglas
+puro y determinista) y **Hitos C0 a C6 del plan de combate cerrados** (sandbox
+de combate, fichas y composicion, coreografia de ronda, conquista y cruce
+maritimo, mapa vivo, audio y arte final).
 
 ## Requisitos
 
@@ -105,6 +106,25 @@ Regla de dependencias: `rules` no importa `three`, DOM, Colyseus ni Node.
 - Siempre saltable: clic, Espacio o Esc.
 - Ver `docs/adr/0005-fichas-instanciadas-y-composicion.md` y
   `docs/adr/0006-combate-visual-no-decide.md`.
+
+## Motor de reglas
+
+- `packages/rules` es un motor **puro, determinista y sin dependencias** de DOM,
+  Three.js, Colyseus ni Node.
+- `apply(state, command, playerId, { rng, config })` devuelve un **nuevo** estado
+  (nunca muta el de entrada) y los eventos que la UI anima. `getLegalCommands`
+  lista las jugadas validas para la UI y los bots.
+- **8 comandos**: `PLACE_ARMIES`, `TRADE_CARDS`, `ATTACK`, `MOVE_AFTER_CONQUEST`,
+  `REGROUP`, `END_PHASE`, `END_TURN`, `SURRENDER`. Fases: `setup-placement`,
+  `reinforce`, `attack`, `conquest-move`, `regroup`, `game-over`.
+- El RNG se **inyecta** (mulberry32) y es serializable (`snapshot()`): una
+  partida se reproduce con `(seed, lista de comandos)`.
+- **Nada hardcodeado**: todo numero ajustable vive en `RulesConfig`
+  (`packages/shared`).
+- Cubierto por property tests, un test de odds contra un resolvedor de Bellman
+  independiente y una simulacion de 1000 partidas con bot legal-aleatorio que
+  demuestra que el motor no tiene callejones sin salida.
+- Ver `docs/adr/0003-motor-de-reglas-puro-y-determinista.md`.
 
 ## Idiomas
 
