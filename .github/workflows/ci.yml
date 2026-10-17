@@ -55,6 +55,9 @@ jobs:
       - name: Build del cliente
         run: pnpm build
 
+      - name: Navegador de los smokes
+        run: npx playwright install --with-deps chromium
+
       - name: Smoke de pantallas
         run: pnpm smoke
 
