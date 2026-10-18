@@ -56,9 +56,84 @@ async function main(): Promise<void> {
     return page;
   };
 
-  // --- Pantalla de configuracion local (pantalla inicial) ----------------------
+  // --- Landing (pantalla inicial, Hito 5) --------------------------------------
   let page = await abrir();
   await page.goto(url, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+
+  const tituloLanding = page.locator('#landing h1');
+  if ((await tituloLanding.count()) === 0) {
+    fallas.push({ check: 'landing', detail: 'no aparece el titulo del hero' });
+  }
+
+  // Accesibilidad basica: un solo h1, jerarquia sin saltos y todo control con
+  // nombre accesible. OJO: dentro de `evaluate` no van funciones con nombre;
+  // el bundler las envuelve con un helper (`__name`) que no existe en la pagina.
+  const a11y = await page.evaluate(() => {
+    const raiz = document.getElementById('landing');
+    if (raiz === null) return { h1: 0, saltos: [] as string[], sinNombre: [] as string[] };
+    const encabezados = Array.from(raiz.querySelectorAll('h1, h2, h3, h4'));
+    const saltos: string[] = [];
+    for (let i = 1; i < encabezados.length; i += 1) {
+      const anterior = Number((encabezados[i - 1] as Element).tagName.slice(1));
+      const actual = Number((encabezados[i] as Element).tagName.slice(1));
+      if (actual - anterior > 1) saltos.push(`h${anterior} -> h${actual}`);
+    }
+    const sinNombre = Array.from(raiz.querySelectorAll('button, a'))
+      .filter((elemento) => {
+        const texto = (elemento.textContent ?? '').trim();
+        return texto === '' && elemento.getAttribute('aria-label') === null;
+      })
+      .map((elemento) => elemento.outerHTML.slice(0, 60));
+    return { h1: raiz.querySelectorAll('h1').length, saltos, sinNombre };
+  });
+  if (a11y.h1 !== 1) {
+    fallas.push({ check: 'landing', detail: `la landing tiene ${a11y.h1} h1 (esperado 1)` });
+  }
+  if (a11y.saltos.length > 0) {
+    fallas.push({ check: 'landing', detail: `saltos de nivel: ${a11y.saltos.join(', ')}` });
+  }
+  if (a11y.sinNombre.length > 0) {
+    fallas.push({
+      check: 'landing',
+      detail: `controles sin nombre: ${a11y.sinNombre.join(' | ')}`,
+    });
+  }
+
+  await page.screenshot({ path: join(OUTPUT_DIR, 'smoke-landing.png') });
+
+  // El boton de jugar tiene que llevar a la configuracion (y cambiar la URL).
+  // Se busca por atributo, no por texto: en CI el navegador arranca en ingles.
+  const jugar = page.locator('#landing button[data-accion="jugar"]').first();
+  if ((await jugar.count()) === 0) {
+    fallas.push({ check: 'landing', detail: 'no aparece el boton de jugar' });
+  } else {
+    await jugar.click();
+    await page.waitForTimeout(700);
+    if (!page.url().includes('jugar=1')) {
+      fallas.push({ check: 'landing', detail: `la URL no cambio a ?jugar=1 (${page.url()})` });
+    }
+    if ((await page.locator('#hud button[data-accion="empezar"]').count()) === 0) {
+      fallas.push({ check: 'landing', detail: 'jugar no lleva a la configuracion' });
+    }
+    // La landing se va y el lienzo vuelve a estar disponible.
+    if ((await page.locator('#landing').count()) > 0) {
+      fallas.push({ check: 'landing', detail: 'la landing no se desmonta al jugar' });
+    }
+    const lienzoVisible = await page.evaluate(() => {
+      const lienzo = document.getElementById('lienzo');
+      return lienzo !== null && getComputedStyle(lienzo).display !== 'none';
+    });
+    if (!lienzoVisible) {
+      fallas.push({ check: 'landing', detail: 'el lienzo sigue oculto tras entrar a jugar' });
+    }
+  }
+  await page.close();
+
+  // --- Configuracion local -----------------------------------------------------
+  // Con `?jugar=1` se entra directo, sin pasar por la landing.
+  page = await abrir();
+  await page.goto(`${url}?jugar=1`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const setupText =
     (await page

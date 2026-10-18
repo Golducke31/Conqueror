@@ -183,9 +183,21 @@ export function createTerritoryMaterial(
 export interface HighlightMaterialHandle {
   readonly material: ShaderMaterial;
   setHover(territoryIndex: number): void;
+  /** Origen de la accion (territorio propio elegido). */
   setSelected(territoryIndex: number): void;
+  /** Destino de la accion (enemigo al que se va a atacar). */
+  setTarget(territoryIndex: number): void;
   setOpacity(value: number): void;
+  /** Reloj para el pulso de la seleccion. */
+  setTime(seconds: number): void;
   dispose(): void;
+}
+
+/** Colores de los tres estados de resaltado del tablero. */
+export interface HighlightColors {
+  readonly hover: Color;
+  readonly selected: Color;
+  readonly target: Color;
 }
 
 const HIGHLIGHT_VERTEX = /* glsl */ `
@@ -200,28 +212,43 @@ const HIGHLIGHT_VERTEX = /* glsl */ `
 const HIGHLIGHT_FRAGMENT = /* glsl */ `
   uniform float uHover;
   uniform float uSelected;
+  uniform float uTarget;
   uniform vec3 uHoverColor;
   uniform vec3 uSelectedColor;
+  uniform vec3 uTargetColor;
+  uniform float uHoverOpacity;
+  uniform float uSelectedOpacity;
+  uniform float uTargetOpacity;
   uniform float uOpacity;
+  uniform float uTime;
   varying float vTerritory;
   void main() {
     float isHover = step(abs(vTerritory - uHover), 0.5);
     float isSelected = step(abs(vTerritory - uSelected), 0.5);
-    float weight = max(isHover, isSelected);
+    float isTarget = step(abs(vTerritory - uTarget), 0.5);
+    float weight = max(max(isHover, isSelected), isTarget);
     if (weight < 0.5) discard;
-    vec3 tint = mix(uHoverColor, uSelectedColor, isSelected);
-    gl_FragColor = vec4(tint, uOpacity * weight);
+
+    // El destino manda sobre el origen y el origen sobre el hover: si un
+    // territorio cumple dos roles (p. ej. el puntero esta sobre el origen), se
+    // pinta el rol mas fuerte en vez de mezclar colores.
+    vec3 tint = uHoverColor;
+    tint = mix(tint, uSelectedColor, isSelected);
+    tint = mix(tint, uTargetColor, isTarget);
+
+    float alpha = max(max(uHoverOpacity * isHover, uSelectedOpacity * isSelected), uTargetOpacity * isTarget);
+    // Pulso suave: la seleccion activa se nota sin parpadear.
+    alpha *= 0.84 + 0.16 * sin(uTime * 4.2);
+    gl_FragColor = vec4(tint, alpha * uOpacity);
   }
 `;
 
 /**
  * Malla de resaltado: comparte la geometria del tablero y descarta en el
- * fragment shader todo lo que no sea el territorio apuntado o seleccionado.
+ * fragment shader todo lo que no sea el territorio apuntado, el origen o el
+ * destino de la accion en curso.
  */
-export function createHighlightMaterial(
-  hoverColor: Color,
-  selectedColor: Color,
-): HighlightMaterialHandle {
+export function createHighlightMaterial(colors: HighlightColors): HighlightMaterialHandle {
   const material = new ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -235,9 +262,17 @@ export function createHighlightMaterial(
     uniforms: {
       uHover: { value: -1 },
       uSelected: { value: -1 },
-      uHoverColor: { value: hoverColor.clone() },
-      uSelectedColor: { value: selectedColor.clone() },
-      uOpacity: { value: 0.28 },
+      uTarget: { value: -1 },
+      uHoverColor: { value: colors.hover.clone() },
+      uSelectedColor: { value: colors.selected.clone() },
+      uTargetColor: { value: colors.target.clone() },
+      // El destino es el estado que mas tiene que gritar: es el que el jugador
+      // esta por confirmar.
+      uHoverOpacity: { value: 0.22 },
+      uSelectedOpacity: { value: 0.38 },
+      uTargetOpacity: { value: 0.5 },
+      uOpacity: { value: 1 },
+      uTime: { value: 0 },
     },
   });
 
@@ -249,8 +284,14 @@ export function createHighlightMaterial(
     setSelected(territoryIndex: number): void {
       material.uniforms['uSelected']!.value = territoryIndex;
     },
+    setTarget(territoryIndex: number): void {
+      material.uniforms['uTarget']!.value = territoryIndex;
+    },
     setOpacity(value: number): void {
       material.uniforms['uOpacity']!.value = value;
+    },
+    setTime(seconds: number): void {
+      material.uniforms['uTime']!.value = seconds;
     },
     dispose(): void {
       material.dispose();

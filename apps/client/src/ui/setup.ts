@@ -66,6 +66,16 @@ export function renderSetup(contenedor: HTMLElement, opciones: SetupOpciones): v
     'pointer-events-auto mx-auto w-full max-w-xl self-center rounded-xl border border-lana-3/70 bg-lana/90 p-6 shadow-xl shadow-hilo/60 backdrop-blur-sm',
   );
 
+  // Volver a la landing: la configuracion es una pantalla, no la puerta de
+  // entrada. Enlace normal (no SPA) para que el boton "atras" siga siendo el
+  // del navegador.
+  const volver = document.createElement('a');
+  volver.href = './';
+  volver.className =
+    'mb-4 inline-flex items-center gap-1.5 text-[11px] text-algodon/50 hover:text-qolli';
+  volver.textContent = `← ${t('landing.pie.volver')}`;
+  centro.append(volver);
+
   centro.append(
     nodo('h1', 'font-display text-2xl tracking-wide text-qolli', t('app.nombre')),
     nodo('p', 'mt-1 text-sm text-algodon/60', t('setup.descripcion')),

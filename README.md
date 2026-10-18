@@ -4,12 +4,12 @@ Juego de conquista mundial por turnos para **2 a 6 jugadores**, con tablero 3D
 sobre el **mapa real del mundo**, modo **local (hot-seat)** y modo **online**
 (servidor autoritativo).
 
-Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 4 cerrados**
+Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 5 cerrados**
 (base del proyecto, datos del mapa, tablero 3D interactivo, motor de reglas
-puro y determinista, y modo local jugable de punta a punta) y **Hitos C0 a C6
-del plan de combate cerrados** (sandbox de combate, fichas y composicion,
-coreografia de ronda, conquista y cruce maritimo, mapa vivo, audio y arte
-final).
+puro y determinista, modo local jugable de punta a punta y landing) y **Hitos
+C0 a C6 del plan de combate cerrados** (sandbox de combate, fichas y
+composicion, coreografia de ronda, conquista y cruce maritimo, mapa vivo, audio
+y arte final).
 
 ## Requisitos
 
@@ -35,7 +35,8 @@ pnpm map:preview      # escribe packages/map-data/generated/map-preview.svg
 
 | Ruta                   | Que es                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `/`                    | Pantalla de configuración y partida local (2–6 jugadores, bots opcionales, hot-seat).                        |
+| `/`                    | Landing: presentacion del juego con scroll animado. El botón “Jugar” lleva a la configuración.               |
+| `/?jugar=1`            | Pantalla de configuración y partida local (2–6 jugadores, bots opcionales, hot-seat).                        |
 | `/?auto=1`             | Arranca directo una partida local. `&jugadores=3&humanos=1&delay=0&semilla=N` la configuran (bots y humano). |
 | `/?explorar=1`         | Tablero con datos de prueba, sin reglas (herramienta del Hito 2). `?jugadores=2..6` cambia la cantidad.      |
 | `/?explorar=1&debug=1` | Lo mismo, con el overlay de FPS, draw calls y unidades visibles.                                             |
@@ -152,6 +153,57 @@ Regla de dependencias: `rules` no importa `three`, DOM, Colyseus ni Node.
 - Verificado por dos smokes: una partida local de 3 bots se juega de inicio a
   fin (`pnpm smoke:match`) y las pantallas y sandboxes cargan sin errores
   (`pnpm smoke`).
+
+## Interacción con el mapa
+
+El mapa se maneja con el mouse o el dedo, y **el mismo flujo sirve en los dos**:
+
+- **Clic en un territorio** → muestra su nombre, dueño y ejércitos, y si es tuyo
+  lo elige como **origen** de la acción de la fase (colocar, atacar, reagrupar).
+- **Clic en otro territorio** → se elige como **destino**. Si es un vecino
+  enemigo o neutral, el ataque se ejecuta en ese mismo clic.
+- **La flecha de ataque** queda fija sobre el frente elegido (no desaparece al
+  mover el mouse) y la probabilidad de conquista se muestra al apuntar, antes
+  de decidir.
+- **Estados visuales distintos**: el origen se resalta en oro, el destino en
+  rojo y el territorio apuntado en crema, con un pulso suave para que la
+  selección activa se distinga de un hover cualquiera.
+- **Cada país lleva su nombre impreso en el mapa**, con descarte por colisión:
+  si dos nombres se pisan, se dibuja el del territorio apuntado/elegido y el
+  más grande, así nunca se lee un nombre sobre otro.
+- Un clic que no se puede ejecutar (un enemigo no vecino, un origen sin
+  ejércitos) **explica el motivo** en el panel en lugar de no hacer nada.
+
+La decisión de qué hacer con un clic vive en
+`apps/client/src/scenes/game/selectionModel.ts`: una función pura que recibe el
+estado público del motor y el territorio tocado, y devuelve la intención
+(inspeccionar, elegir origen, elegir destino, atacar o rechazar con motivo).
+La escena solo dibuja; el HUD y los botones usan exactamente el mismo estado.
+
+El encuadre inicial se calcula a partir del tamaño del tablero y de la relación
+de aspecto del lienzo, así que el mundo entra completo igual en un monitor que
+en un teléfono en vertical.
+
+## Landing (Hito 5)
+
+La puerta de entrada (`/`) presenta el mapa, el combate y los modos, y lleva a la
+configuración de partida.
+
+- **Se carga por import dinámico** (`ui/landing.ts`): el chunk propio pesa ~27 kB
+  gzip y quien entra directo a jugar (`?auto=1`, `?explorar=1`, `?jugar=1`) no
+  descarga GSAP, Lenis ni su CSS.
+- **Scroll suave con Lenis** sincronizado con **ScrollTrigger** en un solo loop
+  (`gsap.ticker`), y títulos partidos con **SplitText** en modo `aria: 'auto'`
+  para que el texto siga siendo accesible.
+- **Dados en 3D de CSS** que ruedan al entrar en cuadro; ningún WebGL en la
+  landing, así carga al instante y no compite con la partida.
+- **Movimiento reducido**: con `prefers-reduced-motion` no se inicializa nada de
+  lo anterior y el contenido queda visible y quieto.
+- **Accesibilidad**: enlace de salto, un solo `h1`, jerarquía de encabezados sin
+  saltos, `aria-pressed` en el selector de idioma y foco visible. El smoke
+  verifica el `h1`, los saltos de nivel y que todo control tenga nombre.
+- El botón “Jugar” hace `pushState` a `?jugar=1` y monta la configuración sin
+  recargar; “atrás” vuelve a la landing.
 
 ## Idiomas
 

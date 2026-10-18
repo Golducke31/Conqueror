@@ -1,15 +1,15 @@
 /**
- * Arranque del cliente (Hito 4).
+ * Arranque del cliente (Hitos 4 y 5).
  *
- * Tres modos:
- *   - `?explorar=1`  tablero con datos de prueba, sin reglas (herramienta de
- *                    desarrollo, la del Hito 2).
- *   - `?auto=1`      arranca directo una partida local (por defecto, de bots):
- *                    la usan el smoke e2e y las pruebas manuales del flujo.
- *   - por defecto    pantalla de configuracion de partida local.
+ * Modos:
+ *   - por defecto      landing (Hito 5), la puerta de entrada.
+ *   - `?jugar=1`       pantalla de configuracion de partida local.
+ *   - `?explorar=1`    tablero con datos de prueba, sin reglas (Hito 2).
+ *   - `?auto=1`        arranca directo una partida local (por defecto, de bots):
+ *                      la usan el smoke e2e y las pruebas manuales del flujo.
  *
- * El Hito 2 dejo el tablero andando; el motor de reglas llego en el Hito 3 y
- * aca se enchufa a la partida jugable (Hito 4).
+ * La landing entra por import dinamico: quien va directo a jugar no descarga
+ * GSAP, Lenis ni su CSS.
  */
 
 import './styles/main.css';
@@ -370,8 +370,11 @@ async function arrancarExploracion(canvas: HTMLCanvasElement): Promise<void> {
     app.gameState = gameState;
     scene.setGameState(gameState);
 
-    scene.onSelect((id) => {
+    // Modo exploracion: no hay partida, asi que el clic solo elige y encuadra.
+    // La logica de origen/destino vive en la partida (scenes/game/matchApp).
+    scene.onPick((id) => {
       app.selected = id;
+      scene.setSelection({ origin: id, target: null });
       if (id !== null) scene.focusTerritory(id, { distance: 320, polarDeg: 44 });
       pintar();
     });
@@ -398,7 +401,12 @@ async function arrancarExploracion(canvas: HTMLCanvasElement): Promise<void> {
     pintar();
   }
 
-  document.addEventListener(LOCALE_CHANGE_EVENT, pintar);
+  const alCambiarIdioma = (): void => {
+    // Los nombres estan horneados en el atlas del mapa: se rehacen.
+    app.scene?.refreshLabels();
+    pintar();
+  };
+  document.addEventListener(LOCALE_CHANGE_EVENT, alCambiarIdioma);
 }
 
 // -----------------------------------------------------------------------------
@@ -474,10 +482,37 @@ async function main(): Promise<void> {
     return;
   }
 
-  renderSetup(hud, {
-    config: DEFAULT_RULES_CONFIG,
-    onStart: (setup) => arrancarPartida(setup, canvas, hud),
+  const abrirConfiguracion = (): void => {
+    renderSetup(hud, {
+      config: DEFAULT_RULES_CONFIG,
+      onStart: (setup) => arrancarPartida(setup, canvas, hud),
+    });
+  };
+
+  if (params.get('jugar') === '1') {
+    abrirConfiguracion();
+    return;
+  }
+
+  // --- Landing (Hito 5) ------------------------------------------------------
+  const { mountLanding } = await import('./ui/landing.js');
+  const landing = mountLanding({
+    onPlay: () => {
+      landing.dispose();
+      // URL propia para que se pueda compartir y para que el boton "atras"
+      // tenga a donde volver.
+      window.history.pushState({}, '', '?jugar=1');
+      abrirConfiguracion();
+    },
+    onExplore: () => {
+      window.location.href = '?explorar=1';
+    },
   });
+
+  // Volver atras desde la configuracion tiene que devolver la landing. El
+  // estado de la landing no se conserva: se recarga, que es mas simple y
+  // siempre consistente.
+  window.addEventListener('popstate', () => window.location.reload(), { once: true });
 }
 
 if (document.readyState === 'loading') {

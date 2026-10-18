@@ -28,10 +28,19 @@ export const BORDER_COLOR = new Color('#8fa0c8');
 export const SEA_ROUTE_COLOR = new Color('#e2a72e');
 /** Resaltado al pasar el puntero. */
 export const HOVER_COLOR = new Color('#efe4cc');
-/** Resaltado del territorio seleccionado. */
+/** Resaltado del territorio seleccionado (origen de la accion). */
 export const SELECT_COLOR = new Color('#e2a72e');
+/**
+ * Resaltado del destino de ataque. Rojo mas luminoso que `grana` porque aca se
+ * mezcla con el color del territorio enemigo y tiene que distinguirse de el.
+ */
+export const TARGET_COLOR = new Color('#d8414f');
 /** Color de las etiquetas numericas sin dueno. */
 export const LABEL_NEUTRAL_COLOR = new Color('#c9d3ea');
+/** Color del nombre del territorio impreso sobre el mapa. */
+export const LABEL_COLOR = new Color('#dfe7f7');
+/** Color del nombre resaltado (territorio apuntado, origen o destino). */
+export const LABEL_EMPHASIS_COLOR = new Color('#ffe6a8');
 
 const cache = new Map<string, Color>();
 

@@ -34,6 +34,108 @@ import {
 /** Encabezado del HUD de una pagina concreta (los locators no sobreviven al cierre). */
 const encabezado = (p: Page): ReturnType<Page['locator']> => p.locator('#hud header[data-fase]');
 
+/**
+ * Comprueba que el clic sobre el mapa hace algo de verdad.
+ *
+ * Se apoya en el gancho `__conqueror.screenOf` (solo con `?debug=1`) para saber
+ * donde cae cada territorio: asi el clic es un clic real sobre el lienzo y no
+ * una llamada interna. Las comprobaciones son por atributos del DOM y no por
+ * texto, para que no dependan del idioma del navegador.
+ */
+async function verificarClicEnMapa(page: Page, fallas: Failure[]): Promise<void> {
+  /** Posicion en pantalla de un territorio, si cae sobre el lienzo. */
+  const puntoDe = async (id: string | null): Promise<{ x: number; y: number } | null> => {
+    if (id === null) return null;
+    const punto = await page.evaluate(
+      (territorio) =>
+        (
+          window as unknown as {
+            __conqueror?: { screenOf: (t: string) => { x: number; y: number } | null };
+          }
+        ).__conqueror?.screenOf(territorio) ?? null,
+      id,
+    );
+    if (punto === null) return null;
+    // Si el HUD tapa el punto, el clic iria al panel y no al mapa.
+    const libre = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.id === 'lienzo',
+      punto,
+    );
+    return libre ? punto : null;
+  };
+
+  const origenes = page.locator('#hud button[data-ataque="origen"]');
+  const total = await origenes.count();
+  let origen: { id: string; punto: { x: number; y: number } } | null = null;
+  for (let i = 0; i < total && origen === null; i += 1) {
+    const id = await origenes.nth(i).getAttribute('data-territorio');
+    const punto = await puntoDe(id);
+    if (punto !== null && id !== null) origen = { id, punto };
+  }
+
+  if (origen === null) {
+    fallas.push({
+      check: 'clic-mapa',
+      detail: 'ningun territorio propio quedo visible para tocar',
+    });
+    return;
+  }
+
+  // Antes del clic no hay destinos: sin origen elegido no hay a donde atacar.
+  const destinosAntes = await page.locator('#hud button[data-ataque="destino"]').count();
+  await page.mouse.click(origen.punto.x, origen.punto.y);
+  await page.waitForTimeout(350);
+  const destinosDespues = await page.locator('#hud button[data-ataque="destino"]').count();
+
+  if (destinosAntes > 0 || destinosDespues === 0) {
+    fallas.push({
+      check: 'clic-mapa',
+      detail: `el clic no eligio origen (destinos: ${destinosAntes} -> ${destinosDespues})`,
+    });
+    return;
+  }
+
+  // Ahora el destino: tocar un vecino enemigo tiene que disparar el ataque.
+  const destinos = page.locator('#hud button[data-ataque="destino"]');
+  const cuantos = await destinos.count();
+  let objetivo: { x: number; y: number } | null = null;
+  for (let i = 0; i < cuantos && objetivo === null; i += 1) {
+    objetivo = await puntoDe(await destinos.nth(i).getAttribute('data-territorio'));
+  }
+  if (objetivo === null) {
+    fallas.push({ check: 'clic-mapa', detail: 'ningun destino quedo visible para tocar' });
+    return;
+  }
+
+  await page.mouse.click(objetivo.x, objetivo.y);
+
+  // Una ronda resuelta deja los dados en el registro ("origen [a b] vs ...").
+  // Se espera a que la animacion termine y el HUD vuelva a pintarse.
+  const aparecio = await page
+    .waitForFunction(
+      () => document.querySelector('#hud')?.textContent?.includes('[') ?? false,
+      undefined,
+      { timeout: 12_000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!aparecio) {
+    fallas.push({ check: 'clic-mapa', detail: 'el clic en el destino no resolvio ninguna ronda' });
+  }
+  await page.screenshot({ path: join(OUTPUT_DIR, 'smoke-clic-mapa.png') });
+
+  // Si la conquista quedo pendiente hay que resolver el movimiento: la partida
+  // tiene que quedar en una fase con cierre de turno para el resto del flujo.
+  const faseAhora = await page.locator('#hud header[data-fase]').getAttribute('data-fase');
+  if (faseAhora === 'conquest-move') {
+    const mover = page.locator('#hud button[data-accion="mover"]');
+    if ((await mover.count()) > 0) {
+      await mover.first().click();
+      await page.waitForTimeout(800);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const { url, close } = await startStaticServer();
   const errores = new Errores();
@@ -49,7 +151,7 @@ async function main(): Promise<void> {
   // --- 1. Un humano juega un turno completo -------------------------------------------
   console.log('[match] flujo 1: un humano, dos bots');
   let page = await abrir();
-  await page.goto(`${url}?auto=1&jugadores=3&humanos=1&delay=0&semilla=${SEMILLA}`, {
+  await page.goto(`${url}?auto=1&jugadores=3&humanos=1&delay=0&debug=1&semilla=${SEMILLA}`, {
     waitUntil: 'networkidle',
   });
 
@@ -89,6 +191,12 @@ async function main(): Promise<void> {
   await ataque.first().waitFor({ timeout: 30_000 });
   await ataque.first().click();
   await page.waitForTimeout(300);
+
+  // --- Clic sobre el mapa: origen y destino ---------------------------------------
+  // Regresion del bug "el clic dibuja la flecha pero no hace nada": tocar un
+  // territorio propio tiene que elegirlo como origen, y tocar un vecino
+  // enemigo tiene que atacar de verdad.
+  await verificarClicEnMapa(page, fallas);
 
   // Turno completo: terminar el turno (paso por reagrupe tambien).
   const finTurno = page.locator('#hud button[data-accion="fin-turno"]');

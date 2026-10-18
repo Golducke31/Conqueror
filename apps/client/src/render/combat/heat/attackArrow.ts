@@ -1,14 +1,20 @@
 /**
  * Flecha de avance (mapa vivo, fuera de combate).
  *
- * Cuando el jugador tiene un territorio propio seleccionado y apunta a un
- * vecino enemigo, aparece una flecha animada sobre la frontera que indica el
+ * Cuando el jugador tiene un territorio propio seleccionado y apunta (o elige)
+ * un vecino enemigo, aparece una flecha animada sobre la frontera que indica el
  * ataque inminente (plan de combate, seccion 10). Es pura presentacion: el
- * ataque real lo dispara el jugador con el HUD, no la flecha.
+ * ataque real lo dispara el jugador, la flecha no decide nada.
  *
- * La flecha es un arco entre los anclas de los dos territorios: un cilindro
+ * La flecha es un arco entre las anclas de los dos territorios: un cilindro
  * como astil, un cono como punta y una esfera pulso que viaja del origen al
  * destino. Con `prefers-reduced-motion` se muestra quieta, sin pulso.
+ *
+ * ESCALA: la camara del mapa estrategico esta mucho mas lejos que la del
+ * sandbox de combate, asi que la flecha acepta una escala. Se aplica al GROSOR
+ * y a la altura del arco, nunca a la posicion: los vertices ya estan en
+ * coordenadas de mundo, y escalar el grupo desplazaria la flecha fuera del
+ * tablero (multiplicaria tambien las posiciones).
  */
 
 import gsap from 'gsap';
@@ -34,11 +40,11 @@ const ARC_LIFT = 26;
 const ARROW_BASE_LIFT = 3;
 
 /** Radio del astil. */
-const SHAFT_RADIUS = 1.1;
+const SHAFT_RADIUS = 2.2;
 
 /** Tamano de la punta. */
-const HEAD_RADIUS = 2.6;
-const HEAD_HEIGHT = 7;
+const HEAD_RADIUS = 3.4;
+const HEAD_HEIGHT = 9;
 
 /** Radio del pulso viajero. */
 const PULSE_RADIUS = 1.8;
@@ -60,12 +66,20 @@ export interface ArrowTarget {
   readonly baseY: number;
   /** Color del atacante. */
   readonly color: Color;
+  /**
+   * Escala de la flecha. En el mapa estrategico la camara esta lejos y una
+   * flecha de tamaño fijo quedaria de un pixel: la escena la agranda con la
+   * distancia para que se lea igual que en el sandbox.
+   */
+  readonly scale?: number;
 }
 
 export interface AttackArrow {
   readonly group: Group;
   /** Muestra la flecha apuntando de un territorio a otro. */
   show(target: ArrowTarget): void;
+  /** Cambia la escala en caliente (la camara se alejo o acerco). */
+  setScale(value: number): void;
   /** Esconde la flecha (con fundido, salvo movimiento reducido). */
   hide(): void;
   /** True si hay una flecha visible. */
@@ -74,10 +88,10 @@ export interface AttackArrow {
 }
 
 /** Punto del arco en `t` (0..1): bezier cuadratica con el control en el alto. */
-function arcPoint(target: ArrowTarget, t: number): Vector3 {
+function arcPoint(target: ArrowTarget, t: number, scale: number): Vector3 {
   const { fromX, fromZ, toX, toZ, baseY } = target;
-  const controlY = baseY + ARC_LIFT * 1.6;
-  const endY = baseY + ARROW_BASE_LIFT;
+  const controlY = baseY + ARC_LIFT * 1.6 * scale;
+  const endY = baseY + ARROW_BASE_LIFT * scale;
   const u = 1 - t;
   return new Vector3(
     u * u * fromX + 2 * u * t * ((fromX + toX) / 2) + t * t * toX,
@@ -105,16 +119,21 @@ export function createAttackArrow(options: AttackArrowOptions): AttackArrow {
   let visible = false;
   let pulseTimeline: gsap.core.Timeline | null = null;
   let current: ArrowTarget | null = null;
+  /** Escala base vigente (sin contar el rebote de entrada). */
+  let baseScale = 1;
+  /** Factor del rebote de entrada, 0.4 -> 1. */
+  let pop = 1;
 
   const stopPulse = (): void => {
     pulseTimeline?.kill();
     pulseTimeline = null;
   };
 
-  /** Coloca astil y punta segun el arco actual. */
+  /** Coloca astil y punta segun el arco actual, con la escala vigente. */
   const placeArrow = (target: ArrowTarget): void => {
-    const start = arcPoint(target, 0.12);
-    const end = arcPoint(target, 0.94);
+    const scale = Math.max(0.2, baseScale * pop);
+    const start = arcPoint(target, 0.12, scale);
+    const end = arcPoint(target, 0.94, scale);
     const dir = end.clone().sub(start);
     const length = dir.length();
     if (length < 1e-3) return;
@@ -125,13 +144,16 @@ export function createAttackArrow(options: AttackArrowOptions): AttackArrow {
 
     shaftMesh.position.copy(start).addScaledVector(dir, length / 2);
     shaftMesh.quaternion.copy(quaternion);
-    shaftMesh.scale.set(1, length, 1);
+    // El cilindro mide 1 de alto: se estira al largo del arco y se engrosa con
+    // la escala (nunca se escala la posicion).
+    shaftMesh.scale.set(scale, length, scale);
 
     headMesh.position.copy(end);
     headMesh.quaternion.copy(quaternion);
-    headMesh.scale.setScalar(1);
+    headMesh.scale.setScalar(scale);
 
     pulseMesh.position.copy(start);
+    pulseMesh.scale.setScalar(scale);
   };
 
   const startPulse = (): void => {
@@ -149,10 +171,10 @@ export function createAttackArrow(options: AttackArrowOptions): AttackArrow {
       ease: 'none',
       onUpdate: () => {
         if (current === null) return;
-        pulseMesh.position.copy(arcPoint(current, state.t));
+        pulseMesh.position.copy(arcPoint(current, state.t, baseScale));
         // El pulso se enciende al salir y se apaga al llegar.
         const fade = Math.sin(Math.PI * state.t);
-        pulseMesh.scale.setScalar(0.6 + 0.4 * fade);
+        pulseMesh.scale.setScalar((0.6 + 0.4 * fade) * baseScale);
         options.renderer.requestRender();
       },
     });
@@ -167,6 +189,8 @@ export function createAttackArrow(options: AttackArrowOptions): AttackArrow {
       group.visible = true;
       material.color.copy(target.color);
       material.opacity = 0.9;
+      baseScale = Math.max(0.2, target.scale ?? 1);
+      pop = 1;
       placeArrow(target);
       startPulse();
 
@@ -174,18 +198,31 @@ export function createAttackArrow(options: AttackArrowOptions): AttackArrow {
         options.renderer.requestRender();
         return;
       }
-      // Entrada con un pequeño rebote de escala.
-      const scale = { v: 0.4 };
-      gsap.to(scale, {
+      // Entrada con un pequeño rebote de grosor (no de posicion).
+      const anim = { v: 0.4 };
+      gsap.to(anim, {
         v: 1,
         duration: 0.28,
         ease: 'back.out(2.4)',
         onUpdate: () => {
-          group.scale.setScalar(scale.v);
+          pop = anim.v;
+          if (current !== null) placeArrow(current);
           options.renderer.requestRender();
         },
-        onComplete: () => group.scale.setScalar(1),
+        onComplete: () => {
+          pop = 1;
+          if (current !== null) placeArrow(current);
+        },
       });
+    },
+
+    setScale(value: number): void {
+      const next = Math.max(0.2, value);
+      if (Math.abs(next - baseScale) < 0.02) return;
+      baseScale = next;
+      if (!visible || current === null) return;
+      placeArrow(current);
+      options.renderer.requestRender();
     },
 
     hide(): void {

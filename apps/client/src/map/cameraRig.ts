@@ -52,6 +52,37 @@ export interface CameraRig {
 const POLAR_MIN = (Math.PI * 18) / 180;
 const POLAR_MAX = (Math.PI * 72) / 180;
 
+export interface BoardFitOptions {
+  readonly boardWidth: number;
+  readonly boardHeight: number;
+  readonly fovDeg: number;
+  /** Relacion de aspecto del lienzo (ancho / alto). */
+  readonly aspect: number;
+  /** Inclinacion respecto del cenit, en grados. */
+  readonly polarDeg?: number;
+  /** Aire alrededor del tablero (1 = justo al borde). */
+  readonly margin?: number;
+}
+
+/**
+ * Distancia de camara con la que entra el tablero completo.
+ *
+ * Hace falta calcularla en vez de usar una constante: en un telefono en
+ * vertical el ancho visible es una fraccion del de un monitor, y una distancia
+ * fija deja medio mapa fuera de cuadro. El tablero esta en el plano XZ, asi que
+ * con la camara inclinada su profundidad se comprime en pantalla por
+ * `cos(polar)`.
+ */
+export function boardFitDistance(options: BoardFitOptions): number {
+  const polar = ((options.polarDeg ?? 42) * Math.PI) / 180;
+  const margin = options.margin ?? 1.12;
+  const tanHalf = Math.tan((options.fovDeg * Math.PI) / 360);
+  const aspect = Math.max(0.2, options.aspect);
+  const porAncho = (options.boardWidth * margin) / (2 * tanHalf * aspect);
+  const porAlto = (options.boardHeight * margin * Math.cos(polar)) / (2 * tanHalf);
+  return Math.max(porAncho, porAlto);
+}
+
 export function createCameraRig(options: CameraRigOptions): CameraRig {
   const controls = new MapControls(options.camera, options.domElement);
   controls.enableDamping = true;

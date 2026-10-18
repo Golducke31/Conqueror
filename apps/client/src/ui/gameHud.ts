@@ -11,7 +11,7 @@
  */
 
 import type { TerritoryId } from '@conqueror/shared';
-import type { RulesConfig, SecretMission } from '@conqueror/shared';
+import type { RulesConfig } from '@conqueror/shared';
 import {
   buildClassicBoard,
   estimateBattleOdds,
@@ -23,6 +23,7 @@ import {
 
 import type { GameTransport } from '../net/transport.js';
 import { t } from '../app/i18n.js';
+import { textoMision } from './missionText.js';
 import { boton, chip, deslizador, nodo, titulo } from './dom.js';
 
 export interface GameHudHost {
@@ -47,7 +48,35 @@ export interface GameHud {
   render(state: PublicGameState): void;
   /** Eventos nuevos desde el ultimo render (log y dados). */
   eventos(eventos: readonly GameEvent[]): void;
+  /**
+   * Pinta la seleccion que decidio otro componente (el clic sobre el mapa).
+   * NO manda comandos: solo sincroniza lo que el panel muestra.
+   */
+  setSelection(selection: SelectionState): void;
+  /**
+   * Avisa cuando la seleccion cambia desde el HUD (chips de territorio), para
+   * que el mapa dibuje el mismo origen y destino.
+   */
+  onSelection(callback: (selection: SelectionState) => void): void;
+  /** Territorio bajo el puntero en el mapa, para el renglon de "apuntado". */
+  setHover(territory: TerritoryId | null): void;
+  /**
+   * Probabilidad de conquista del ataque que el mapa esta previsualizando
+   * (`null` si no hay ninguno). Se muestra junto al territorio apuntado para
+   * que el jugador decida antes de hacer clic.
+   */
+  setAttackOdds(probability: number | null): void;
+  /** Territorio solo mirado: muestra su nombre sin elegirlo como origen. */
+  setFocus(territory: TerritoryId | null): void;
+  /** Aviso efimero: explica por que una accion no fue posible. */
+  aviso(texto: string): void;
   dispose(): void;
+}
+
+/** Seleccion que comparten el mapa y el HUD. */
+export interface SelectionState {
+  readonly origin: TerritoryId | null;
+  readonly target: TerritoryId | null;
 }
 
 /** Estado de la interfaz (no de la partida): que esta eligiendo el jugador. */
@@ -56,6 +85,8 @@ interface EstadoUi {
   attackTo: TerritoryId | null;
   regFrom: TerritoryId | null;
   regTo: TerritoryId | null;
+  /** Territorio solo mirado (clic en el mapa), sin quedar seleccionado. */
+  foco: TerritoryId | null;
   placeCount: number;
   moveCount: number;
   cardSel: string[];
@@ -63,26 +94,6 @@ interface EstadoUi {
 
 /** Tablero clasico, para los simbolos de las tarjetas (una sola vez). */
 const BOARD = buildClassicBoard();
-
-/** Texto de una mision secreta. */
-function textoMision(mision: SecretMission, nombres: (id: TerritoryId) => string): string {
-  switch (mision.kind) {
-    case 'conquer-continents': {
-      const continentes = mision.continents.map((c) => t(`continente.${c}`)).join(', ');
-      return t('mision.continentes', { continentes, extra: mision.extraTerritories });
-    }
-    case 'eliminate-player':
-      return t('mision.eliminar', { color: t(`color.${mision.targetColor}`) });
-    case 'conquer-territories':
-      return t('mision.territorios', { cantidad: mision.count });
-    case 'own-territories':
-      return t('mision.propios', {
-        territorios: mision.territories.map(nombres).join(', '),
-      });
-    default:
-      return '';
-  }
-}
 
 /** Texto de un evento para el log. */
 function textoEvento(
@@ -134,6 +145,7 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
     attackTo: null,
     regFrom: null,
     regTo: null,
+    foco: null,
     placeCount: 1,
     moveCount: 1,
     cardSel: [],
@@ -141,6 +153,51 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
   const log: string[] = [];
   let ultimaRonda: Extract<GameEvent, { type: 'BATTLE_ROUND_RESOLVED' }> | null = null;
   let estado: PublicGameState | null = null;
+
+  const selectionListeners = new Set<(selection: SelectionState) => void>();
+  /** Ultima seleccion emitida, para no repetir avisos identicos. */
+  let ultimaEmision: SelectionState = { origin: null, target: null };
+  /** Renglon de "apuntado": se actualiza sin re-renderizar todo el panel. */
+  let nodoHover: HTMLElement | null = null;
+  let hoverTerritory: TerritoryId | null = null;
+  /** Probabilidad del ataque previsualizado por el mapa, si hay. */
+  let hoverOdds: number | null = null;
+  /** Aviso efimero vigente (texto y vencimiento). */
+  let avisoTexto = '';
+  let avisoHasta = 0;
+  let nodoAviso: HTMLElement | null = null;
+
+  const emitirSeleccion = (): void => {
+    const actual: SelectionState = { origin: ui.selected, target: ui.attackTo };
+    if (actual.origin === ultimaEmision.origin && actual.target === ultimaEmision.target) return;
+    ultimaEmision = actual;
+    for (const listener of selectionListeners) listener(actual);
+  };
+
+  /** Texto del renglon de "apuntado" segun el estado actual. */
+  const textoHover = (): string => {
+    if (hoverTerritory === null || estado === null) return '';
+    const territorio = estado.territories[hoverTerritory];
+    if (territorio === undefined) return '';
+    const dueno = estado.players.find((player) => player.id === territorio.owner);
+    const base = `${host.nombres(hoverTerritory)} · ${dueno?.name ?? t('hud.sinDueno')} · ${territorio.armies} ${t('hud.ejercitos')}`;
+    if (hoverOdds === null) return base;
+    return `${base} · ${t('hud.odds', { valor: Math.round(hoverOdds * 100) })}`;
+  };
+
+  const pintarHover = (): void => {
+    if (nodoHover === null) return;
+    const texto = textoHover();
+    nodoHover.textContent = texto;
+    nodoHover.classList.toggle('hidden', texto === '');
+  };
+
+  const pintarAviso = (): void => {
+    if (nodoAviso === null) return;
+    const vigente = avisoTexto !== '' && Date.now() < avisoHasta;
+    nodoAviso.textContent = vigente ? avisoTexto : '';
+    nodoAviso.classList.toggle('hidden', !vigente);
+  };
 
   // ---------------------------------------------------------------------------
   // Partes
@@ -208,11 +265,19 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
       'aside',
       'pointer-events-auto w-60 shrink-0 space-y-3 rounded-lg border border-lana-3/70 bg-lana/85 p-3 text-sm shadow-xl shadow-hilo/50 backdrop-blur-sm sm:w-64',
     );
+    // En el telefono el panel solo lleva lo que la barra no muestra (mision y
+    // tarjetas): la lista de jugadores esta arriba, en la barra.
+    panel.classList.add('max-sm:w-full', 'max-sm:max-w-sm');
 
     const activo = state.players.find((player) => player.id === state.activePlayer);
 
-    panel.append(titulo(t('hud.jugadores')));
-    const lista = nodo('ul', 'mt-2 space-y-1');
+    const tituloJugadores = titulo(t('hud.jugadores'));
+    tituloJugadores.classList.add('hidden', 'sm:block');
+    panel.append(tituloJugadores);
+    // En un telefono la barra superior ya muestra a cada jugador con sus
+    // territorios y ejercitos: repetir la lista aca se come media pantalla y
+    // tapa el mapa. Se oculta solo en pantallas chicas.
+    const lista = nodo('ul', 'mt-2 hidden space-y-1 sm:block');
     for (const player of state.players) {
       const fila = nodo(
         'li',
@@ -301,6 +366,11 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
         'max-h-40 overflow-y-auto rounded border border-lana-3/60 bg-hilo/60 p-2 font-mono text-[10px] leading-relaxed text-algodon/70',
       );
       for (const linea of log.slice(-14)) registro.append(nodo('div', '', linea));
+      // El registro se lee de abajo hacia arriba: lo ultimo que paso tiene que
+      // quedar a la vista sin que el jugador tenga que scrollear.
+      requestAnimationFrame(() => {
+        registro.scrollTop = registro.scrollHeight;
+      });
       panel.append(titulo(t('hud.log')), registro);
     }
 
@@ -335,7 +405,9 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
   function panelAcciones(state: PublicGameState): HTMLElement {
     const panel = nodo(
       'section',
-      'pointer-events-auto w-full max-w-sm space-y-3 rounded-lg border border-lana-3/70 bg-lana/85 p-3 text-sm shadow-xl shadow-hilo/50 backdrop-blur-sm',
+      // En el telefono el panel se limita en alto y scrollea por dentro: si
+      // crece con la lista de territorios, tapa el mapa que hay que tocar.
+      'pointer-events-auto max-h-[46vh] w-full max-w-sm space-y-3 overflow-y-auto rounded-lg border border-lana-3/70 bg-lana/85 p-3 text-sm shadow-xl shadow-hilo/50 backdrop-blur-sm sm:max-h-none',
     );
     const ocupado = host.busy();
 
@@ -343,20 +415,50 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
       panel.append(nodo('p', 'text-[12px] text-qolli', t('hud.batallaEnCurso')));
     }
 
-    // --- Detalle del territorio seleccionado ---------------------------------
-    if (ui.selected !== null) {
+    // Aviso efimero: por que el ultimo clic no hizo nada.
+    nodoAviso = nodo(
+      'p',
+      'hidden rounded border border-grana/70 bg-grana/15 px-2 py-1 text-[11px] text-algodon',
+    );
+    nodoAviso.setAttribute('role', 'status');
+    panel.append(nodoAviso);
+    pintarAviso();
+
+    // Renglon de "apuntado": nombre del territorio bajo el puntero. Se
+    // actualiza sin re-renderizar, asi sigue al mouse sin parpadeos.
+    nodoHover = nodo('p', 'hidden text-[11px] text-algodon/60');
+    panel.append(nodoHover);
+    pintarHover();
+
+    // --- Detalle del territorio ----------------------------------------------
+    // Se muestra el territorio elegido como origen; si no hay ninguno, el que
+    // el jugador acaba de tocar en el mapa (aunque no se pueda elegir, su
+    // nombre tiene que verse).
+    const mostrado = ui.selected ?? ui.foco;
+    if (mostrado !== null) {
       const detalle = nodo('div', 'rounded border border-lana-3/60 bg-hilo/50 p-2');
-      const territorio = state.territories[ui.selected];
+      const territorio = state.territories[mostrado];
       const dueno = territorio?.owner ?? null;
       const jugador = state.players.find((player) => player.id === dueno);
+      const esOrigen =
+        ui.selected !== null && (state.phase === 'attack' || state.phase === 'regroup');
       detalle.append(
-        titulo(t('hud.territorio')),
+        titulo(esOrigen ? t('hud.origen') : t('hud.territorio')),
         nodo(
           'p',
           'mt-1 text-sm text-algodon',
-          `${host.nombres(ui.selected)} · ${jugador?.name ?? t('hud.sinDueno')} · ${territorio?.armies ?? 0} ${t('hud.ejercitos')}`,
+          `${host.nombres(mostrado)} · ${jugador?.name ?? t('hud.sinDueno')} · ${territorio?.armies ?? 0} ${t('hud.ejercitos')}`,
         ),
       );
+      if (esOrigen) {
+        detalle.append(
+          nodo(
+            'p',
+            'mt-0.5 text-[11px] text-algodon/55',
+            ui.attackTo === null ? t('hud.ayuda.destino') : t('hud.ayuda.confirmar'),
+          ),
+        );
+      }
       panel.append(detalle);
     }
 
@@ -431,6 +533,9 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
 
     if (state.phase === 'attack') {
       cuerpo.append(titulo(t('hud.ataque')));
+      if (ui.selected === null) {
+        cuerpo.append(nodo('p', 'text-[11px] text-algodon/55', t('hud.ayuda.origen')));
+      }
       if (ultimaRonda !== null) {
         const rondabox = nodo(
           'div',
@@ -708,12 +813,16 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
   function render(state: PublicGameState | null): void {
     estado = state;
     contenedor.replaceChildren();
+    nodoHover = null;
+    nodoAviso = null;
     if (state === null) return;
 
     const barraEl = barra(state);
     const cuerpo = nodo(
       'div',
-      'flex min-h-0 flex-1 flex-wrap items-start justify-between gap-3 overflow-y-auto p-3 sm:p-4',
+      // En el telefono los paneles van uno arriba y otro abajo, para dejar el
+      // centro libre: ahi esta el mapa y es lo que hay que poder tocar.
+      'flex min-h-0 flex-1 flex-col justify-between gap-3 overflow-y-auto p-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:p-4',
     );
     cuerpo.append(panelJugadores(state));
 
@@ -724,6 +833,10 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
     }
 
     contenedor.append(barraEl, cuerpo);
+
+    // La seleccion se publica al final del render: asi el mapa se entera de
+    // los cambios hechos con los chips, sin que cada handler tenga que avisar.
+    emitirSeleccion();
   }
 
   return {
@@ -736,7 +849,39 @@ export function createGameHud(contenedor: HTMLElement, host: GameHudHost): GameH
       }
       while (log.length > 60) log.shift();
     },
+    setSelection(selection: SelectionState): void {
+      const igual = ui.selected === selection.origin && ui.attackTo === selection.target;
+      if (igual) return;
+      ui.selected = selection.origin;
+      ui.attackTo = selection.target;
+      render(estado);
+    },
+    onSelection(callback: (selection: SelectionState) => void): void {
+      selectionListeners.add(callback);
+    },
+    setHover(territory: TerritoryId | null): void {
+      if (territory === hoverTerritory) return;
+      hoverTerritory = territory;
+      pintarHover();
+    },
+    setAttackOdds(probability: number | null): void {
+      if (probability === hoverOdds) return;
+      hoverOdds = probability;
+      pintarHover();
+    },
+    setFocus(territory: TerritoryId | null): void {
+      if (ui.foco === territory) return;
+      ui.foco = territory;
+      render(estado);
+    },
+    aviso(texto: string): void {
+      avisoTexto = texto;
+      avisoHasta = Date.now() + 2600;
+      pintarAviso();
+      window.setTimeout(pintarAviso, 2700);
+    },
     dispose(): void {
+      selectionListeners.clear();
       contenedor.replaceChildren();
     },
   };
