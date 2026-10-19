@@ -1,33 +1,24 @@
 /**
- * Nucleo del motor en el cliente.
+ * Nucleo del motor, compartido por cliente y servidor.
  *
- * Envuelve el `GameState` completo (con tarjetas y misiones, que NUNCA salen
- * del cliente) y expone solo lo que la UI necesita: la vista publica filtrada
- * por el jugador activo y los eventos para animar.
+ * Envuelve el `GameState` completo (con tarjetas y misiones) y expone solo lo
+ * que cada vista necesita: el estado publico filtrado por espectador y los
+ * eventos para animar.
  *
- * Es puro (sin DOM): lo usan igual el Web Worker del modo local y el motor en
- * el hilo principal (tests, y navegadores sinWorker). La logica de aplicar
- * comandos vive UNA sola vez aca.
+ * Es puro (sin DOM): lo usan igual el Web Worker del modo local, el hilo
+ * principal (tests) y el servidor autoritativo del modo online. La logica de
+ * aplicar comandos vive UNA sola vez aca.
  *
- * Ver docs/adr/0013-modo-local.md
+ * Ver docs/adr/0013-modo-local.md y docs/adr/0016-modo-online.md
  */
 
 import type { PlayerId, RulesConfig } from '@conqueror/shared';
 
-import {
-  apply,
-  createBot,
-  createGameState,
-  createRng,
-  publicState,
-  type Bot,
-  type Command,
-  type GameEvent,
-  type GameState,
-  type PlayerSetup,
-  type PublicGameState,
-  type Rng,
-} from '@conqueror/rules';
+import { apply } from './apply.js';
+import { createBot, type Bot } from './bots.js';
+import { createRng } from './rng.js';
+import { createGameState, publicState, type PlayerSetup } from './state.js';
+import type { Command, GameEvent, GameState, PublicGameState, Rng } from './types.js';
 
 /** Como se arma la partida. */
 export interface GameSpec {
@@ -80,8 +71,23 @@ export class GameCore {
 
   /** Estado visible para el jugador de turno (sin tarjetas ni misiones ajenas). */
   vista(): PublicGameState {
+    return this.vistaPara(this.jugadorDeTurno());
+  }
+
+  /**
+   * Estado visible para un jugador concreto. En hot-seat el espectador es el
+   * jugador de turno; en online cada cliente ve SU vista (`?sala=CODE`), y la
+   * privacidad la garantiza el servidor, que nunca manda la vista de otro.
+   */
+  vistaPara(playerId: PlayerId): PublicGameState {
     if (this.state === null) throw new Error('GameCore: la partida no esta armada');
-    return publicState(this.state, this.state.currentPlayer);
+    return publicState(this.state, playerId);
+  }
+
+  /** Estado completo: solo del lado autoritativo (servidor), nunca viaja. */
+  estadoCompleto(): GameState {
+    if (this.state === null) throw new Error('GameCore: la partida no esta armada');
+    return this.state;
   }
 
   /** Si el jugador de turno lo juega el bot. */
@@ -111,14 +117,19 @@ export class GameCore {
     this.state = resultado.value.state;
     return { ok: true, state: this.vista(), events: resultado.value.events };
   }
+
+  private jugadorDeTurno(): PlayerId {
+    if (this.state === null) throw new Error('GameCore: la partida no esta armada');
+    return this.state.currentPlayer;
+  }
 }
 
 /**
  * Arranca el juego automatico de los bots: mientras el jugador de turno sea un
  * bot, aplica su comando tras `delayMs`. Devuelve una funcion para detenerlo.
  *
- * Vive aca (y no en el worker) para que el motor en hilo principal y el worker
- * compartan el mismo ciclo.
+ * Vive aca (y no en el worker) para que el motor en hilo principal, el worker
+ * del cliente y el servidor compartan el mismo ciclo.
  */
 export function startAutoPlay(
   core: GameCore,

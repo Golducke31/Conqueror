@@ -13,9 +13,15 @@
  * Ver docs/adr/0013-modo-local.md
  */
 
-import type { Command, GameEvent, PublicGameState } from '@conqueror/rules';
+import {
+  GameCore,
+  startAutoPlay,
+  type Command,
+  type GameEvent,
+  type GameSpec,
+  type PublicGameState,
+} from '@conqueror/rules';
 
-import { GameCore, startAutoPlay, type GameSpec } from './engineCore.js';
 import { BaseTransport } from './transport.js';
 
 export interface LocalTransportOptions {

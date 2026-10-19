@@ -28,7 +28,8 @@
     "map:all": "pnpm map:build && pnpm map:validate && pnpm map:balance",
     "map:preview": "tsx scripts/preview-map.ts",
     "smoke": "tsx scripts/smoke-client.ts",
-    "smoke:match": "tsx scripts/smoke-match.ts"
+    "smoke:match": "tsx scripts/smoke-match.ts",
+    "smoke:online": "tsx scripts/smoke-online.ts"
   },
   "devDependencies": {
     "@conqueror/map-data": "workspace:*",

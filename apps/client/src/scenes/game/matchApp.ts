@@ -37,6 +37,7 @@ import {
   type SelectionState,
 } from './selectionModel.js';
 import { LocalTransport } from '../../net/localTransport.js';
+import type { GameTransport } from '../../net/transport.js';
 import { createGameHud, type GameHud } from '../../ui/gameHud.js';
 import { mostrarRelevo, ocultarRelevo } from '../../ui/handoff.js';
 import type { LocalGameSetup } from '../../ui/setup.js';
@@ -50,6 +51,15 @@ export interface MatchOptions {
   /** Demora entre comandos de bot (ms). */
   readonly botDelayMs?: number;
   readonly debug?: boolean;
+  /**
+   * Transporte ya creado (modo online). Si falta, se arma el local: la UI no
+   * sabe donde corre la partida (ADR 0013 / ADR 0016).
+   */
+  readonly transport?: GameTransport;
+  /** Modo online: sin relevo (cada cliente ve solo su vista) y con turno. */
+  readonly online?: boolean;
+  /** Con que jugador de la partida se identifica este cliente (online). */
+  readonly localPlayerId?: string;
   /** Se llama cuando la partida termina o el jugador sale. */
   readonly onExit?: () => void;
 }
@@ -116,20 +126,22 @@ export async function startMatch(options: MatchOptions): Promise<MatchApp> {
   });
   renderer.scene.add(battle.group);
 
-  // --- Transporte: motor en worker ------------------------------------------
-  const transport = await LocalTransport.create({
-    spec: {
-      players: setup.players.map((player) => ({
-        id: player.id,
-        name: player.name,
-        color: player.color,
-      })),
-      config: setup.config,
-      seed: setup.seed,
-      botPlayers: setup.botPlayers,
-    },
-    botDelayMs: options.botDelayMs ?? 700,
-  });
+  // --- Transporte: motor en worker (local) o sala online inyectada -----------
+  const transport: GameTransport =
+    options.transport ??
+    (await LocalTransport.create({
+      spec: {
+        players: setup.players.map((player) => ({
+          id: player.id,
+          name: player.name,
+          color: player.color,
+        })),
+        config: setup.config,
+        seed: setup.seed,
+        botPlayers: setup.botPlayers,
+      },
+      botDelayMs: options.botDelayMs ?? 700,
+    }));
 
   // --- HUD -------------------------------------------------------------------
   const nombres = (id: string): string => scene.data.byId.get(id)?.names[detectLocale()] ?? id;
@@ -298,6 +310,12 @@ export async function startMatch(options: MatchOptions): Promise<MatchApp> {
         return;
 
       case 'attack': {
+        // Online: el servidor valida el turno, pero el aviso sale antes de
+        // mandar un comando que se va a rechazar.
+        if (options.online === true && publico.activePlayer !== options.localPlayerId) {
+          hud.aviso(t('aviso.noTuTurno', { jugador: nombres(publico.activePlayer) }));
+          return;
+        }
         const ejercitos = ctx.territories[intencion.from]?.armies ?? 0;
         // Se deja el destino fijado: la flecha queda sobre el frente elegido y
         // repetir el ataque es otro clic en el mismo lugar.
@@ -444,7 +462,8 @@ export async function startMatch(options: MatchOptions): Promise<MatchApp> {
   const humanosIds = setup.players
     .filter((player) => !setup.botPlayers.includes(player.id))
     .map((player) => player.id);
-  const hayRelevo = humanosIds.length >= 2;
+  // En online cada cliente ve SU vista: no hay nada que ocultar entre turnos.
+  const hayRelevo = options.online !== true && humanosIds.length >= 2;
 
   const gestionarRelevo = (publico: PublicGameState): void => {
     if (!hayRelevo || publico.phase === 'game-over') {
@@ -515,7 +534,9 @@ export async function startMatch(options: MatchOptions): Promise<MatchApp> {
   });
 
   transport.onError((mensaje) => {
-    console.warn('[local]', mensaje);
+    console.warn('[partida]', mensaje);
+    // Online: el rechazo del servidor (turno ajeno, comando ilegal) se ve.
+    if (options.online === true) hud.aviso(mensaje);
   });
 
   // --- Primer pintado -------------------------------------------------------------

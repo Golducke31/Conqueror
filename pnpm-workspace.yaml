@@ -4,8 +4,12 @@ packages:
 
 # pnpm bloquea los scripts de postinstall por defecto (desde v10).
 # esbuild los necesita para verificar/enlazar su binario nativo, y Vite lo usa.
+# msgpackr-extract (dependencia de Colyseus) construye su binario nativo para
+# acelerar la codificacion del protocolo; sin el, cae a JS puro, pero pnpm 11
+# corta el install con builds ignorados.
 allowBuilds:
   esbuild: true
+  msgpackr-extract: true
 
 # Excepciones al enfriamiento de versiones recien publicadas.
 minimumReleaseAgeExclude:

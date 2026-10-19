@@ -24,7 +24,7 @@
 import type { Command, PlayerSetup } from '@conqueror/rules';
 import type { RulesConfig } from '@conqueror/shared';
 
-import { GameCore, startAutoPlay } from './engineCore.js';
+import { GameCore, startAutoPlay } from '@conqueror/rules';
 
 /** Scope minimo del worker, sin depender de `lib.webworker`. */
 interface WorkerScope {

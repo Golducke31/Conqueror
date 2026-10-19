@@ -21,6 +21,10 @@ export * from './state.js';
 export * from './apply.js';
 export * from './legal.js';
 export * from './bots.js';
+// Nucleo compartido (cliente y servidor online): envuelve el GameState completo.
+export * from './core.js';
+// Protocolo del modo online (Hito 6): mensajes cliente <-> servidor.
+export * from './protocol.js';
 
 // Modulos que ya existian y no son parte del motor de reglas.
 export * from './battle-odds.js';

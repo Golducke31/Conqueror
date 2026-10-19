@@ -4,12 +4,12 @@ Juego de conquista mundial por turnos para **2 a 6 jugadores**, con tablero 3D
 sobre el **mapa real del mundo**, modo **local (hot-seat)** y modo **online**
 (servidor autoritativo).
 
-Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 5 cerrados**
+Proyecto en construccion por hitos. Estado actual: **Hitos 0 a 6 cerrados**
 (base del proyecto, datos del mapa, tablero 3D interactivo, motor de reglas
-puro y determinista, modo local jugable de punta a punta y landing) y **Hitos
-C0 a C6 del plan de combate cerrados** (sandbox de combate, fichas y
-composicion, coreografia de ronda, conquista y cruce maritimo, mapa vivo, audio
-y arte final).
+puro y determinista, modo local jugable de punta a punta, landing y modo
+online con servidor autoritativo) y **Hitos C0 a C6 del plan de combate
+cerrados** (sandbox de combate, fichas y composicion, coreografia de ronda,
+conquista y cruce maritimo, mapa vivo, audio y arte final).
 
 ## Requisitos
 
@@ -37,6 +37,8 @@ pnpm map:preview      # escribe packages/map-data/generated/map-preview.svg
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `/`                    | Landing: presentacion del juego con scroll animado. El botón “Jugar” lleva a la configuración.               |
 | `/?jugar=1`            | Pantalla de configuración y partida local (2–6 jugadores, bots opcionales, hot-seat).                        |
+| `/?online=1`           | Lobby online (Hito 6): crear una sala y compartir el link, o unirse con un codigo.                           |
+| `/?sala=CODE`          | Entra directo a una sala online compartida (el link que se copia del lobby).                                 |
 | `/?auto=1`             | Arranca directo una partida local. `&jugadores=3&humanos=1&delay=0&semilla=N` la configuran (bots y humano). |
 | `/?explorar=1`         | Tablero con datos de prueba, sin reglas (herramienta del Hito 2). `?jugadores=2..6` cambia la cantidad.      |
 | `/?explorar=1&debug=1` | Lo mismo, con el overlay de FPS, draw calls y unidades visibles.                                             |
@@ -46,24 +48,25 @@ pnpm map:preview      # escribe packages/map-data/generated/map-preview.svg
 
 ## Comandos
 
-| Comando                             | Que hace                                                                            |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `pnpm dev`                          | Cliente en modo desarrollo (Vite).                                                  |
-| `pnpm dev:server`                   | Servidor minimo con `/health` (Colyseus llega en el Hito 6).                        |
-| `pnpm build`                        | Build de produccion del cliente (tablero + sandbox).                                |
-| `pnpm typecheck`                    | Chequeo de tipos de todos los paquetes y de `scripts/`.                             |
-| `pnpm lint` / `pnpm lint:fix`       | ESLint.                                                                             |
-| `pnpm format` / `pnpm format:check` | Prettier.                                                                           |
-| `pnpm test`                         | Tests unitarios (Vitest).                                                           |
-| `pnpm smoke`                        | Smoke test del cliente con Chromium (pantallas y sandboxes). Requiere `pnpm build`. |
-| `pnpm smoke:match`                  | Smoke test de la partida local (turno humano, relevo, 3 bots de inicio a fin).      |
-| `pnpm map:fetch`                    | Descarga Natural Earth 50m a `data/ne/`.                                            |
-| `pnpm map:build`                    | Genera `territories.json`, `adjacency.json`, `fronts.json` y el TopoJSON.           |
-| `pnpm map:build --suggest`          | Igual, pero en vez de fallar imprime las entradas para pegar en la config.          |
-| `pnpm map:validate`                 | Valida el tablero generado. Falla el build si algo no cierra.                       |
-| `pnpm map:balance`                  | Informe de balance por continente y propuesta de bonos.                             |
-| `pnpm map:all`                      | `map:build` + `map:validate` + `map:balance`.                                       |
-| `pnpm map:preview`                  | Vista previa del tablero en SVG.                                                    |
+| Comando                             | Que hace                                                                                |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| `pnpm dev`                          | Cliente en modo desarrollo (Vite).                                                      |
+| `pnpm dev:server`                   | Servidor autoritativo online (Colyseus) en 127.0.0.1:2567, con `/health`.               |
+| `pnpm build`                        | Build de produccion del cliente (tablero + sandbox).                                    |
+| `pnpm typecheck`                    | Chequeo de tipos de todos los paquetes y de `scripts/`.                                 |
+| `pnpm lint` / `pnpm lint:fix`       | ESLint.                                                                                 |
+| `pnpm format` / `pnpm format:check` | Prettier.                                                                               |
+| `pnpm test`                         | Tests unitarios (Vitest).                                                               |
+| `pnpm smoke`                        | Smoke test del cliente con Chromium (pantallas y sandboxes). Requiere `pnpm build`.     |
+| `pnpm smoke:match`                  | Smoke test de la partida local (turno humano, relevo, 3 bots de inicio a fin).          |
+| `pnpm smoke:online`                 | Smoke test del modo online: servidor + dos clientes reales que crean sala y despliegan. |
+| `pnpm map:fetch`                    | Descarga Natural Earth 50m a `data/ne/`.                                                |
+| `pnpm map:build`                    | Genera `territories.json`, `adjacency.json`, `fronts.json` y el TopoJSON.               |
+| `pnpm map:build --suggest`          | Igual, pero en vez de fallar imprime las entradas para pegar en la config.              |
+| `pnpm map:validate`                 | Valida el tablero generado. Falla el build si algo no cierra.                           |
+| `pnpm map:balance`                  | Informe de balance por continente y propuesta de bonos.                                 |
+| `pnpm map:all`                      | `map:build` + `map:validate` + `map:balance`.                                           |
+| `pnpm map:preview`                  | Vista previa del tablero en SVG.                                                        |
 
 ## Estructura
 
@@ -73,11 +76,11 @@ apps/
     debug/           paginas de desarrollo (sandbox de combate)
     src/app/         bootstrap, i18n, paleta, datos de prueba
     src/map/         proyeccion, geometria del tablero, picking, camara
-    src/net/         GameTransport, LocalTransport (motor en Web Worker)
+    src/net/         GameTransport, LocalTransport (motor en Web Worker) y ColyseusTransport
     src/render/      renderer bajo demanda, materiales, unidades, combate
     src/scenes/      escena del tablero y orquestador de la partida local
-    src/ui/          HUD de partida, pantalla de configuración, relevo (hot-seat)
-  server/            servidor HTTP minimo (Colyseus en el Hito 6)
+    src/ui/          HUD de partida, pantalla de configuración, lobby online, relevo (hot-seat)
+  server/            servidor autoritativo online: sala de Colyseus + /health (Hito 6)
 packages/
   shared/            identificadores, tipos y RulesConfig
   rules/             motor de reglas puro + bots + composeSquad
@@ -153,6 +156,32 @@ Regla de dependencias: `rules` no importa `three`, DOM, Colyseus ni Node.
 - Verificado por dos smokes: una partida local de 3 bots se juega de inicio a
   fin (`pnpm smoke:match`) y las pantallas y sandboxes cargan sin errores
   (`pnpm smoke`).
+
+## Modo online (Hito 6)
+
+Dos o más personas en distintos dispositivos contra un **servidor
+autoritativo**. El servidor corre el motor completo y a cada cliente le manda
+**solo su vista publica** (`publicState(state, viewerId)`): las tarjetas y las
+misiones de los demás nunca viajan.
+
+- **Colyseus** (rooms v2, `@colyseus/core` 0.18 + transporte WebSocket). El
+  conjunto modular, no el meta-paquete: este arrastra uWebSockets por git y
+  rompe la politica de dependencias del workspace. Ver `docs/adr/0016`.
+- **Misma interfaz, otro transporte**: `ColyseusTransport` implementa
+  `GameTransport`, asi el HUD, el director de combate y el relevo se reutilizan
+  sin cambios. En online el relevo se apaga: cada cliente ve su propia vista.
+- **Salas por codigo**: `?online=1` abre el lobby (crear sala y compartir el
+  link, o unirse con codigo). Los asientos se asignan por orden de llegada y el
+  host arranca cuando están todos (puede completar con bots de relleno).
+- **El servidor es el juez**: valida turno (`NOT_YOUR_TURN` fuera de turno) y
+  legalidad (el motor rechaza lo ilegal con su mensaje). Los dados los tira el
+  servidor, no el cliente.
+- **Reconexion**: al caerse, el asiento se reserva 120 s y el mismo cliente lo
+  recupera.
+- **Mismo origen**: el cliente habla con el servidor por `/colyseus` (proxy de
+  Vite en dev y preview), asi un tunel https basta para jugar con un amigo.
+- El nucleo del motor (`GameCore`) vive en `packages/rules`: worker del
+  cliente, hilo principal y servidor comparten la misma implementacion.
 
 ## Interacción con el mapa
 

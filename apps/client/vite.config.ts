@@ -120,9 +120,27 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '127.0.0.1',
+    // Servidor autoritativo (Colyseus, Hito 6): mismo origen via /colyseus,
+    // asi un tunel https basta para jugar online (el cliente usa wss:).
+    proxy: {
+      '/colyseus': {
+        target: process.env['VITE_COLYSEUS'] ?? 'ws://127.0.0.1:2567',
+        ws: true,
+        rewrite: (path) => path.replace(/^\/colyseus/, ''),
+      },
+    },
   },
   preview: {
     port: 4173,
+    // Mismo proxy que en dev: el build servido por `vite preview` (o un tunel
+    // https) habla con el servidor autoritativo por /colyseus.
+    proxy: {
+      '/colyseus': {
+        target: process.env['VITE_COLYSEUS'] ?? 'ws://127.0.0.1:2567',
+        ws: true,
+        rewrite: (path) => path.replace(/^\/colyseus/, ''),
+      },
+    },
   },
   build: {
     target: 'es2022',

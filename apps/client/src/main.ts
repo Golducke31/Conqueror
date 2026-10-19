@@ -21,8 +21,9 @@ import { createMockGameState, type MockGameState } from './app/fixtures.js';
 import { playerColor } from './app/palette.js';
 import { createRenderer, type RendererHandle } from './render/renderer.js';
 import { createGameScene, type AttackOddsInfo, type GameScene } from './scenes/game/GameScene.js';
-import { startMatch } from './scenes/game/matchApp.js';
+import { startMatch, type MatchApp } from './scenes/game/matchApp.js';
 import { renderSetup, type LocalGameSetup } from './ui/setup.js';
+import type { GameTransport } from './net/transport.js';
 
 const params = new URLSearchParams(window.location.search);
 const debugActivo = params.get('debug') === '1' || params.get('debug') === 'combat';
@@ -413,37 +414,63 @@ async function arrancarExploracion(canvas: HTMLCanvasElement): Promise<void> {
 // Modo partida local
 // -----------------------------------------------------------------------------
 
-async function arrancarPartida(
-  setup: LocalGameSetup,
+/**
+ * Arranca la partida y devuelve el control para descartarla. Es el mismo
+ * camino para el modo local y el online (Hito 6): la diferencia es el
+ * transporte con el que habla `matchApp`.
+ */
+async function iniciarPartida(
+  opciones: {
+    setup: LocalGameSetup;
+    transporte?: GameTransport;
+    online?: boolean;
+    playerId?: string;
+  },
   canvas: HTMLCanvasElement,
   hud: HTMLElement,
-): Promise<void> {
+): Promise<MatchApp> {
   // Contenedor del cartel de relevo (hot-seat), por encima de todo.
   const relevo = nodo('div', 'hidden');
   relevo.id = 'relevo';
   document.body.append(relevo);
 
+  const partida = await startMatch({
+    setup: opciones.setup,
+    canvas,
+    hud,
+    relevo,
+    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    botDelayMs: limitar(Number(params.get('delay')), 0, 5000, 700),
+    ...(opciones.transporte === undefined ? {} : { transport: opciones.transporte }),
+    ...(opciones.online === true ? { online: true } : {}),
+    ...(opciones.playerId === undefined ? {} : { localPlayerId: opciones.playerId }),
+    ...(debugActivo ? { debug: true } : {}),
+    onExit: () => {
+      // Se libera la partida completa (worker, render, escenas) antes de
+      // volver: si no, la anterior sigue corriendo.
+      partida.dispose();
+      relevo.remove();
+      hud.replaceChildren();
+      if (opciones.online === true) {
+        window.location.href = './?online=1';
+        return;
+      }
+      renderSetup(hud, {
+        config: DEFAULT_RULES_CONFIG,
+        onStart: (nuevo) => void iniciarPartida({ setup: nuevo }, canvas, hud),
+      });
+    },
+  });
+  return partida;
+}
+
+async function arrancarPartida(
+  setup: LocalGameSetup,
+  canvas: HTMLCanvasElement,
+  hud: HTMLElement,
+): Promise<void> {
   try {
-    const partida = await startMatch({
-      setup,
-      canvas,
-      hud,
-      relevo,
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      botDelayMs: limitar(Number(params.get('delay')), 0, 5000, 700),
-      ...(debugActivo ? { debug: true } : {}),
-      onExit: () => {
-        // Se libera la partida completa (worker, render, escenas) antes de
-        // volver a la configuracion: si no, la anterior sigue corriendo.
-        partida.dispose();
-        relevo.remove();
-        hud.replaceChildren();
-        renderSetup(hud, {
-          config: DEFAULT_RULES_CONFIG,
-          onStart: (nuevo) => void arrancarPartida(nuevo, canvas, hud),
-        });
-      },
-    });
+    await iniciarPartida({ setup }, canvas, hud);
   } catch (error) {
     hud.replaceChildren();
     const caja = nodo(
@@ -479,6 +506,21 @@ async function main(): Promise<void> {
 
   if (params.get('auto') === '1') {
     await arrancarPartida(setupAutomatica(), canvas, hud);
+    return;
+  }
+
+  // --- Modo online (Hito 6) -----------------------------------------------------
+  // `?sala=CODE` entra directo a una sala compartida; `?online=1` abre el lobby
+  // (crear o unirse). El modulo se carga en diferido: quien juega local o mira
+  // la landing no baja el SDK de Colyseus.
+  const codigoSala = params.get('sala');
+  if (codigoSala !== null || params.get('online') === '1') {
+    const { renderOnline } = await import('./ui/online.js');
+    renderOnline(hud, {
+      ...(codigoSala === null ? {} : { codigoInicial: codigoSala }),
+      onStart: (setup, transporte, playerId) =>
+        void iniciarPartida({ setup, transporte, online: true, playerId }, canvas, hud),
+    });
     return;
   }
 

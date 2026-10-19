@@ -213,6 +213,14 @@ export function renderSetup(contenedor: HTMLElement, opciones: SetupOpciones): v
   );
   centro.append(acciones);
 
+  // Entrada al modo online (Hito 6): el cliente habla con el mismo
+  // `GameTransport`, aca solo se elige donde corre la partida.
+  const enlinea = document.createElement('a');
+  enlinea.href = './?online=1';
+  enlinea.className = 'mt-4 inline-flex items-center gap-1.5 text-xs text-qolli hover:underline';
+  enlinea.textContent = t('online.titulo');
+  centro.append(enlinea);
+
   const envoltorio = nodo('div', 'flex min-h-full flex-col justify-center p-4');
   envoltorio.append(centro);
   contenedor.append(envoltorio);
