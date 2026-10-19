@@ -120,6 +120,9 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '127.0.0.1',
+    // Tunel https (cloudflared/ngrok) para jugar online con un amigo: el host
+    // es dinamico, se permite el dominio del tunel.
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', '.lhr.life'],
     // Servidor autoritativo (Colyseus, Hito 6): mismo origen via /colyseus,
     // asi un tunel https basta para jugar online (el cliente usa wss:).
     proxy: {
@@ -132,6 +135,7 @@ export default defineConfig({
   },
   preview: {
     port: 4173,
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', '.lhr.life'],
     // Mismo proxy que en dev: el build servido por `vite preview` (o un tunel
     // https) habla con el servidor autoritativo por /colyseus.
     proxy: {
